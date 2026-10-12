@@ -1,0 +1,6 @@
+{
+  "dense_k": 3,
+  "sparse_k": 5,
+  "top_n": 4,
+  "embedder": "LSA TF-IDF+SVD (131 dimensi, pengganti)"
+}
