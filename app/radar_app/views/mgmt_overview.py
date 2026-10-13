@@ -41,208 +41,299 @@ def render() -> None:
     backlog = int((~high["request_id"].isin(decisions.index)).sum())
 
 
-    ui.kpi_row([
-        ("Transaksi Dinilai", ui.number(len(frame)), f"{year} · {months} bln · {ui.rupiah(frame['amount'].sum())}", ui.BLUE),
-        ("Alert Tinggi / Bulan", ui.number(len(high) / months, 0), f"Rules: ±{ui.number((frame['rule_score'] >= settings.get('rules_threshold', 1)).sum() / months)}/bln", ui.ORANGE),
-        ("Eksposur Berisiko", ui.rupiah(high["amount"].sum()), "Total nominal pada alert Tinggi", ui.RED),
-        ("Akurasi Alert Terbukti", f"{ui.percent(lower)}–{ui.percent(upper)}", "Rentang hasil audit fisik", ui.GREEN),
-        ("Manfaat Bersih / Thn", ui.rupiah(model_impact["manfaat bersih/tahun"]) if model_impact is not None else "-", "Estimasi penghematan", ui.PURPLE),
-        ("Backlog Investigasi", ui.number(backlog), "Alert Tinggi belum diputus", ui.YELLOW),
-    ])
-    ui.explain({
-        "Transaksi Dinilai": f"Seluruh transaksi pengajuan kredit yang dievaluasi sistem pada tahun {year}.",
-        "Alert Tinggi / Bulan": "Rata-rata alert prioritas Tinggi per bulan dibanding ekspektasi rules konvensional.",
-        "Eksposur Berisiko": "Total nilai nominal kredit yang terdeteksi berisiko Tinggi.",
-        "Akurasi Alert Terbukti": "Perkiraan proporsi alert yang terbukti kolusi saat diaudit secara langsung.",
-        "Manfaat Bersih / Thn": "Penghematan kerugian kredit fraud setelah dikurangi biaya investigasi & sistem.",
-        "Backlog Investigasi": "Jumlah alert kategori Tinggi yang masih menunggu disposisi/keputusan investigator.",
-    })
+    # KPI Delta calculations (vs previous year)
+    prev_year = year - 1
+    prev_frame = transactions[transactions["event_time"].dt.year == prev_year]
+    if regions:
+        prev_frame = prev_frame[prev_frame["requester_unit"].map(regions_map).isin(regions)]
+    prev_high = prev_frame[prev_frame["risk_band"] == "Tinggi"]
+
+    tot_tx = len(frame)
+    prev_tot_tx = len(prev_frame)
+    delta_tot = ((tot_tx - prev_tot_tx) / max(prev_tot_tx, 1) * 100) if prev_tot_tx else 0
+
+    n_high = len(high)
+    prev_n_high = len(prev_high)
+    pct_high = (n_high / max(tot_tx, 1) * 100)
+    delta_high = ((n_high - prev_n_high) / max(prev_n_high, 1) * 100) if prev_n_high else 0
+
+    peg_high = set(high["approver_id"]).union(set(high["requester_id"]))
+    prev_peg_high = set(prev_high["approver_id"]).union(set(prev_high["requester_id"]))
+    n_peg = len(peg_high)
+    prev_n_peg = len(prev_peg_high)
+    delta_peg = ((n_peg - prev_n_peg) / max(prev_n_peg, 1) * 100) if prev_n_peg else 0
+
+    exp_high = high["amount"].sum()
+    prev_exp_high = prev_high["amount"].sum()
+    delta_exp = ((exp_high - prev_exp_high) / max(prev_exp_high, 1) * 100) if prev_exp_high else 0
+
+    # Top KPI cards in Executive White Card Style
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.BLUE};'>
+                <div class='kpi-label'>Total Transaksi</div>
+                <div class='kpi-value'>{tot_tx:,}</div>
+                <div class='kpi-sub' style='color: {"#16a34a" if delta_tot <= 0 else "#dc2626"}; font-weight: 600;'>
+                    {'↓' if delta_tot <= 0 else '↑'} {abs(delta_tot):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k2:
+        st.markdown(
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.ORANGE};'>
+                <div class='kpi-label'>Transaksi Berisiko</div>
+                <div class='kpi-value'>{n_high:,} <span style='font-size: 1.05rem; font-weight: 500; color: {ui.INK_SECONDARY};'>({pct_high:.1f}%)</span></div>
+                <div class='kpi-sub' style='color: {"#dc2626" if delta_high > 0 else "#16a34a"}; font-weight: 600;'>
+                    {'↑' if delta_high > 0 else '↓'} {abs(delta_high):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k3:
+        st.markdown(
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.PURPLE};'>
+                <div class='kpi-label'>Pegawai Berisiko</div>
+                <div class='kpi-value'>{n_peg:,}</div>
+                <div class='kpi-sub' style='color: {"#dc2626" if delta_peg > 0 else "#16a34a"}; font-weight: 600;'>
+                    {'↑' if delta_peg > 0 else '↓'} {abs(delta_peg):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k4:
+        st.markdown(
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.RED};'>
+                <div class='kpi-label'>Potensi Eksposur</div>
+                <div class='kpi-value'>{ui.rupiah(exp_high)}</div>
+                <div class='kpi-sub' style='color: {"#dc2626" if delta_exp > 0 else "#16a34a"}; font-weight: 600;'>
+                    {'↑' if delta_exp > 0 else '↓'} {abs(delta_exp):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
     st.write("")
 
     tab_exec, tab_branch = st.tabs([
-        "📊 Ringkasan Eksekutif & Tren Nasional",
+        "📊 Ringkasan Eksekutif & Tren",
         "🗺️ Peta Risiko Wilayah & Kantor Cabang (Drill-Down)",
     ])
 
     with tab_exec:
-        with st.container(border=True):
-            st.markdown("**📌 Ringkasan Masalah Bisnis (Executive Insight):** " + settings.get("problem_statement", "-"))
+        # Row 1: Tren Transaksi Berisiko & Distribusi Red Flag
+        r1_left, r1_right = st.columns([1.45, 1])
 
-        kpis = services.table("monthly_kpis").copy()
-        kpis["year"] = kpis["month"].str[:4].astype(int)
-        latest_month = kpis["month"].max()
-        latest_year = int(latest_month[:4])
-        latest_month_dt = pd.to_datetime(latest_month + "-01")
-        latest_month_label = latest_month_dt.strftime("%b %Y")
-
-        yearly = (
-            kpis.groupby("year")
-            .agg(
-                total_transaksi=("transaksi", "sum"),
-                kasus_kolusi=("kolusi_terkonfirmasi", "sum"),
-                bulan=("month", "count"),
+        with r1_left:
+            st.markdown(
+                """<div style='margin-bottom: 6px; font-weight: 700; font-size: 1.05rem;'>Tren Transaksi Berisiko</div>""",
+                unsafe_allow_html=True,
             )
-            .reset_index()
-        )
-        yearly["rate_per_1000"] = (yearly["kasus_kolusi"] / yearly["total_transaksi"]) * 1000
+            # Monthly trend for current year
+            m_stats = frame.groupby(frame["event_time"].dt.month).agg(
+                total=("request_id", "count"),
+                high=("risk_band", lambda s: (s == "Tinggi").sum()),
+            ).reset_index()
+            months_id = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mei", 6: "Jun", 7: "Jul", 8: "Agu", 9: "Sep", 10: "Okt", 11: "Nov", 12: "Des"}
+            m_stats["label_bulan"] = m_stats["event_time"].map(months_id)
+            m_stats["pct"] = (m_stats["high"] / m_stats["total"].replace(0, np.nan)) * 100
 
-        def get_year_label(row: pd.Series) -> str:
-            y = int(row["year"])
-            if y == latest_year and row["bulan"] < 12:
-                return f"{y}* (s.d. {latest_month_label})"
-            return str(y)
+            fig_t = go.Figure()
+            fig_t.add_bar(
+                x=m_stats["label_bulan"],
+                y=m_stats["high"],
+                name="Transaksi Berisiko",
+                marker=dict(color="#f87171", line=dict(color="#ef4444", width=1)),
+                text=[f"{v:,}" for v in m_stats["high"]],
+                textposition="outside",
+                hovertemplate="<b>Bulan %{x}</b><br>Transaksi Berisiko: %{y:,}<extra></extra>",
+            )
+            fig_t.add_scatter(
+                x=m_stats["label_bulan"],
+                y=m_stats["pct"],
+                name="Persentase terhadap total",
+                mode="lines+markers",
+                yaxis="y2",
+                line=dict(color="#3b82f6", width=3),
+                marker=dict(size=8, color="#2563eb", line=dict(color="white", width=2)),
+                hovertemplate="<b>Bulan %{x}</b><br>Persentase: %{y:.1f}%<extra></extra>",
+            )
+            fig_t.update_layout(
+                yaxis=dict(title="Jumlah transaksi", showgrid=True, gridcolor="#f1f5f9", range=[0, max(m_stats["high"]) * 1.3]),
+                yaxis2=dict(title="Persentase", overlaying="y", side="right", showgrid=False, ticksuffix="%", range=[0, max(m_stats["pct"]) * 1.4]),
+                xaxis=dict(title=""),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+                margin=dict(t=35, b=20, l=10, r=10),
+                height=340,
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+            )
+            st.plotly_chart(fig_t, use_container_width=True)
 
-        yearly["label"] = yearly.apply(get_year_label, axis=1)
+        with r1_right:
+            st.markdown(
+                """<div style='margin-bottom: 6px; font-weight: 700; font-size: 1.05rem;'>Distribusi Red Flag Transaksi</div>""",
+                unsafe_allow_html=True,
+            )
+            # Red flag donut chart
+            rf_data = [
+                ("Near Limit", int(high["rf_near_limit"].sum())),
+                ("After Hours", int(high["rf_after_hours"].sum())),
+                ("Fast Approval", int(high["rf_fast_approval"].sum())),
+                ("Repeat Debtor", int(high["rf_debtor_repeat"].sum())),
+                ("Pair Dependency", int(high["rf_pair_dependency"].sum())),
+            ]
+            df_rf = pd.DataFrame(rf_data, columns=["flag", "jumlah"])
+            df_rf = df_rf[df_rf["jumlah"] > 0]
+            fig_donut = px.pie(
+                df_rf,
+                names="flag",
+                values="jumlah",
+                hole=0.55,
+                color="flag",
+                color_discrete_map={
+                    "Near Limit": "#ef4444",
+                    "After Hours": "#f97316",
+                    "Fast Approval": "#eab308",
+                    "Repeat Debtor": "#8b5cf6",
+                    "Pair Dependency": "#3b82f6",
+                },
+            )
+            fig_donut.update_traces(
+                textposition="inside",
+                textinfo="percent",
+                hovertemplate="<b>%{label}</b><br>Jumlah: %{value:,} alert (%{percent})<extra></extra>",
+            )
+            fig_donut.update_layout(
+                margin=dict(t=20, b=20, l=10, r=10),
+                height=340,
+                legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.02),
+                paper_bgcolor="white",
+            )
+            st.plotly_chart(fig_donut, use_container_width=True)
 
-        left, right = st.columns([1.45, 1])
+        st.divider()
 
-        with left:
-            t_hdr_col, t_sel_col = st.columns([1.3, 1.2])
-            t_hdr_col.markdown("##### 📈 Tren Kasus Kolusi & Rasio per 1.000 Kredit")
-            trend_view = t_sel_col.radio(
-                "Pilihan Tampilan Tren",
-                ["Semua Tahun (2021–2026)", f"Detail Bulanan ({year})"],
-                horizontal=True,
-                key="mgmt_trend_view",
-                label_visibility="collapsed",
+        # Row 2: Top 5 Unit dengan Transaksi Berisiko & Top 5 Sektor Usaha Berisiko
+        r2_left, r2_right = st.columns(2)
+        with r2_left:
+            st.markdown(
+                """<div style='margin-bottom: 10px; font-weight: 700; font-size: 1.05rem;'>Top 5 Unit dengan Transaksi Berisiko</div>""",
+                unsafe_allow_html=True,
+            )
+            top_u_counts = high["requester_unit"].value_counts().head(5)
+            u_totals = frame["requester_unit"].value_counts()
+            for u_name, u_cnt in top_u_counts.items():
+                tot_u = u_totals.get(u_name, max(u_cnt, 1))
+                u_pct = (u_cnt / max(len(high), 1)) * 100
+                st.markdown(
+                    f"""<div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;'>
+                        <div style='width: 140px; font-weight: 600; font-size: 0.9rem; color: {ui.INK};'>{u_name}</div>
+                        <div style='flex: 1; margin: 0 16px; background: #fee2e2; border-radius: 999px; height: 16px; overflow: hidden;'>
+                            <div style='width: {min(u_pct * 3.5, 100):.1f}%; background: #ef4444; height: 100%; border-radius: 999px;'></div>
+                        </div>
+                        <div style='width: 60px; text-align: right; font-weight: 700; font-size: 0.92rem;'>{u_cnt:,}</div>
+                        <div style='width: 65px; text-align: right; color: {ui.INK_SECONDARY}; font-size: 0.85rem;'>{u_pct:.0f}% total</div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+        with r2_right:
+            st.markdown(
+                """<div style='margin-bottom: 10px; font-weight: 700; font-size: 1.05rem;'>Top 5 Sektor Usaha Berisiko</div>""",
+                unsafe_allow_html=True,
+            )
+            top_s_counts = high["business_sector"].value_counts().head(5)
+            for s_name, s_cnt in top_s_counts.items():
+                s_pct = (s_cnt / max(len(high), 1)) * 100
+                st.markdown(
+                    f"""<div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;'>
+                        <div style='width: 140px; font-weight: 600; font-size: 0.9rem; color: {ui.INK};'>{s_name}</div>
+                        <div style='flex: 1; margin: 0 16px; background: #fee2e2; border-radius: 999px; height: 16px; overflow: hidden;'>
+                            <div style='width: {min(s_pct * 1.8, 100):.1f}%; background: #ef4444; height: 100%; border-radius: 999px;'></div>
+                        </div>
+                        <div style='width: 60px; text-align: right; font-weight: 700; font-size: 0.92rem;'>{s_cnt:,}</div>
+                        <div style='width: 65px; text-align: right; color: {ui.INK_SECONDARY}; font-size: 0.85rem;'>{s_pct:.0f}% total</div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+        st.divider()
+
+        # Row 3: Pegawai dengan Risiko Tertinggi & Dampak Potensial
+        r3_left, r3_right = st.columns([1.45, 1])
+        with r3_left:
+            st.markdown(
+                """<div style='margin-bottom: 10px; font-weight: 700; font-size: 1.05rem;'>Pegawai dengan Risiko Tertinggi</div>""",
+                unsafe_allow_html=True,
+            )
+            emp_table = services.table("employees").set_index("employee_id")
+            emp_names = emp_table["employee_name"].to_dict()
+            emp_units = emp_table["unit_name"].to_dict()
+
+            # Rank employees by exposure
+            high_appr = high.groupby("approver_id").agg(
+                n_high=("request_id", "count"),
+                exp_high=("amount", "sum"),
+            ).reset_index()
+            tot_appr = frame.groupby("approver_id")["request_id"].count().to_dict()
+            high_appr["total_tx"] = high_appr["approver_id"].map(tot_appr)
+            high_appr["pct_high"] = (high_appr["n_high"] / high_appr["total_tx"].replace(0, np.nan) * 100)
+            high_appr["nama"] = high_appr["approver_id"].map(emp_names)
+            high_appr["unit"] = high_appr["approver_id"].map(emp_units)
+            top_emp = high_appr.sort_values("exp_high", ascending=False).head(5)
+
+            st.dataframe(
+                top_emp[["nama", "unit", "total_tx", "pct_high", "exp_high"]],
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "nama": "Nama",
+                    "unit": "Unit Kerja",
+                    "total_tx": st.column_config.NumberColumn("Jumlah Transaksi", format="%d"),
+                    "pct_high": st.column_config.ProgressColumn("% Berisiko", min_value=0, max_value=100, format="%.0f%%"),
+                    "exp_high": st.column_config.NumberColumn("Potensi Eksposur", format="Rp %,.0f"),
+                },
+            )
+            st.caption("Peringkat dihitung dari total akumulasi plafon transaksi berisiko Tinggi yang disetujui.")
+
+        with r3_right:
+            st.markdown(
+                """<div style='margin-bottom: 10px; font-weight: 700; font-size: 1.05rem;'>Dampak Potensial</div>""",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+                <div class='exec-stat-box'>
+                    <div style='font-size: 2rem;'>💰</div>
+                    <div>
+                        <div style='font-size: 1.35rem; font-weight: 700; color: {ui.INK};'>{ui.rupiah(exp_high)}</div>
+                        <div style='font-size: 0.83rem; color: {ui.INK_SECONDARY};'>Total potensi eksposur dari transaksi berisiko</div>
+                    </div>
+                </div>
+                <div class='exec-stat-box'>
+                    <div style='font-size: 2rem;'>📊</div>
+                    <div>
+                        <div style='font-size: 1.35rem; font-weight: 700; color: {ui.INK};'>{n_high:,}</div>
+                        <div style='font-size: 0.83rem; color: {ui.INK_SECONDARY};'>Transaksi berisiko ({pct_high:.1f}% dari total)</div>
+                    </div>
+                </div>
+                <div class='exec-stat-box'>
+                    <div style='font-size: 2rem;'>👥</div>
+                    <div>
+                        <div style='font-size: 1.35rem; font-weight: 700; color: {ui.INK};'>{n_peg:,}</div>
+                        <div style='font-size: 0.83rem; color: {ui.INK_SECONDARY};'>Pegawai dengan keterlibatan berisiko</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-            if trend_view == "Semua Tahun (2021–2026)":
-                yearly = (
-                    kpis.groupby("year")
-                    .agg(
-                        total_transaksi=("transaksi", "sum"),
-                        kasus_kolusi=("kolusi_terkonfirmasi", "sum"),
-                        bulan=("month", "count"),
-                    )
-                    .reset_index()
-                )
-                yearly["rate_per_1000"] = (yearly["kasus_kolusi"] / yearly["total_transaksi"]) * 1000
+        st.divider()
 
-                def get_year_label(row: pd.Series) -> str:
-                    y = int(row["year"])
-                    if y == latest_year and row["bulan"] < 12:
-                        return f"{y}* (Jan–Sep)"
-                    return str(y)
-
-                yearly["label"] = yearly.apply(get_year_label, axis=1)
-
-                fig_trend = go.Figure()
-                bar_colors = ["#3b82f6" if int(y) == int(year) else "#1d4ed8" for y in yearly["year"]]
-                fig_trend.add_bar(
-                    x=yearly["label"],
-                    y=yearly["kasus_kolusi"],
-                    name="Kasus Kolusi Terbukti (Audit)",
-                    marker=dict(color=bar_colors, line=dict(color="#1e3a8a", width=1)),
-                    text=[f"<b>{k:,}</b>" for k in yearly["kasus_kolusi"]],
-                    textposition="outside",
-                    hovertemplate="<b>Tahun %{x}</b><br>Kasus Terbukti: <b>%{y:,} kasus</b><extra></extra>",
-                )
-                fig_trend.add_scatter(
-                    x=yearly["label"],
-                    y=yearly["rate_per_1000"],
-                    name="Tingkat per 1.000 Pengajuan",
-                    mode="lines+markers+text",
-                    yaxis="y2",
-                    line=dict(color="#ea580c", width=3.5),
-                    marker=dict(size=9, color="#ea580c", line=dict(color="white", width=2)),
-                    text=[f"<b>{r:.1f}</b>" for r in yearly["rate_per_1000"]],
-                    textposition="top center",
-                    textfont=dict(color="#c2410c", size=11),
-                    hovertemplate="<b>Tahun %{x}</b><br>Tingkat: <b>%{y:.2f} per 1.000 kredit</b><extra></extra>",
-                )
-                fig_trend.update_layout(
-                    yaxis=dict(
-                        title="Jumlah Kasus Kolusi (Kasus)",
-                        showgrid=True,
-                        gridcolor="rgba(0,0,0,0.06)",
-                        range=[0, max(yearly["kasus_kolusi"]) * 1.25],
-                    ),
-                    yaxis2=dict(
-                        title="Tingkat per 1.000 Pengajuan",
-                        overlaying="y",
-                        side="right",
-                        showgrid=False,
-                        range=[0, max(yearly["rate_per_1000"]) * 1.35],
-                    ),
-                    xaxis=dict(title="", tickmode="array", tickvals=yearly["label"]),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-                    margin=dict(t=35, b=20, l=10, r=10),
-                    height=360,
-                )
-                st.plotly_chart(
-                    ui.style_figure(
-                        fig_trend,
-                        "",
-                        "Batang: total kasus terbukti · Garis: normalisasi per 1.000 pengajuan agar adil terhadap perubahan volume kredit",
-                        height=360,
-                    ),
-                    use_container_width=True,
-                )
-                st.caption(
-                    f"ℹ️ *Tahun 2026 merupakan data berjalan sementara (YTD s.d. {latest_month_label}, 9 bulan). Garis rasio per 1.000 pengajuan menjaga perbandingan tetap adil."
-                )
-            else:
-                m_year = kpis[kpis["year"] == year].copy()
-                m_year["month_num"] = m_year["month"].str[5:7].astype(int)
-                months_id = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mei", 6: "Jun", 7: "Jul", 8: "Agu", 9: "Sep", 10: "Okt", 11: "Nov", 12: "Des"}
-                m_year["label_bulan"] = m_year["month_num"].map(months_id)
-                m_year["rate_per_1000"] = (m_year["kolusi_terkonfirmasi"] / m_year["transaksi"].replace(0, np.nan)) * 1000
-
-                fig_month = go.Figure()
-                fig_month.add_bar(
-                    x=m_year["label_bulan"],
-                    y=m_year["kolusi_terkonfirmasi"],
-                    name="Kasus Kolusi Bulanan",
-                    marker=dict(color="#2563eb", line=dict(color="#1e40af", width=1)),
-                    text=[f"<b>{k:,}</b>" for k in m_year["kolusi_terkonfirmasi"]],
-                    textposition="outside",
-                    hovertemplate="<b>Bulan %{x}</b><br>Kasus Terbukti: <b>%{y:,} kasus</b><extra></extra>",
-                )
-                fig_month.add_scatter(
-                    x=m_year["label_bulan"],
-                    y=m_year["rate_per_1000"],
-                    name="Tingkat per 1.000 Kredit",
-                    mode="lines+markers+text",
-                    yaxis="y2",
-                    line=dict(color="#ea580c", width=3.5),
-                    marker=dict(size=8, color="#ea580c", line=dict(color="white", width=2)),
-                    text=[f"<b>{r:.1f}</b>" for r in m_year["rate_per_1000"]],
-                    textposition="top center",
-                    textfont=dict(color="#c2410c", size=11),
-                    hovertemplate="<b>Bulan %{x}</b><br>Tingkat: <b>%{y:.2f} per 1.000 kredit</b><extra></extra>",
-                )
-                fig_month.update_layout(
-                    yaxis=dict(
-                        title="Kasus Kolusi (Kasus)",
-                        showgrid=True,
-                        gridcolor="rgba(0,0,0,0.06)",
-                        range=[0, max(m_year["kolusi_terkonfirmasi"]) * 1.25],
-                    ),
-                    yaxis2=dict(
-                        title="Tingkat per 1.000 Kredit",
-                        overlaying="y",
-                        side="right",
-                        showgrid=False,
-                        range=[0, max(m_year["rate_per_1000"]) * 1.35],
-                    ),
-                    xaxis=dict(title=""),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-                    margin=dict(t=35, b=20, l=10, r=10),
-                    height=360,
-                )
-                st.plotly_chart(
-                    ui.style_figure(
-                        fig_month,
-                        "",
-                        f"Dinamika bulanan tahun {year}: pergerakan kasus terbukti audit dan rasionya per 1.000 transaksi",
-                        height=360,
-                    ),
-                    use_container_width=True,
-                )
-                st.caption(f"ℹ️ Menampilkan rincian performa bulanan untuk tahun evaluasi terpilih ({year}).")
-
+        # Retained Dark Chart Section: Wilayah dengan Konsentrasi Alert Tertinggi & Konsentrasi Sektor / Komunitas
+        st.markdown("#### 🔍 Peta Wilayah & Portofolio Risiko Terkonsentrasi")
         u_yr = unit_risk[unit_risk["year"] == year]
         if regions:
             u_yr = u_yr[u_yr["region"].isin(regions)]
@@ -260,23 +351,40 @@ def render() -> None:
             .reset_index()
         )
         reg_summary["alert_rate"] = reg_summary["alert"] / reg_summary["transaksi"].replace(0, np.nan)
-        reg_top = reg_summary.dropna(subset=["alert_rate"]).sort_values("alert_rate").tail(12)
+        reg_top = reg_summary.dropna(subset=["alert_rate"]).sort_values("alert_rate").tail(8)
+
+        # Retained dark background horizontal bar chart from attached screenshot
         fig_reg = px.bar(
             reg_top,
             x="alert_rate",
             y=grp_col,
             orientation="h",
             color="alert_rate",
-            color_continuous_scale=["#dbe9fb", ui.ORANGE],
+            color_continuous_scale=["#f3c3a3", "#e07a4a", "#ea580c"],
             labels={"alert_rate": "% Transaksi Alert Tinggi", grp_col: ""},
         )
-        fig_reg.update_layout(coloraxis_showscale=False, xaxis_tickformat=".1%", height=420)
-        right.plotly_chart(
-            ui.style_figure(fig_reg, chart_title, chart_sub, height=420),
-            use_container_width=True,
+        fig_reg.update_layout(
+            coloraxis_showscale=False,
+            xaxis=dict(
+                title="% Transaksi Alert Tinggi",
+                tickformat=".1%",
+                gridcolor="#262626",
+                color="#ffffff",
+                zerolinecolor="#333333",
+            ),
+            yaxis=dict(color="#ffffff", gridcolor="#262626"),
+            paper_bgcolor="#14171a",
+            plot_bgcolor="#14171a",
+            font=dict(color="#ffffff"),
+            margin=dict(l=10, r=20, t=50, b=20),
+            height=380,
+            title=dict(
+                text=f"<b>{chart_title}</b><br><span style='font-size:12px;color:#a0a0a0;'>{chart_sub}</span>",
+                font=dict(color="#ffffff", size=15),
+                x=0,
+            ),
         )
-
-        st.divider()
+        st.plotly_chart(fig_reg, use_container_width=True)
 
         c_seg, c_comm = st.columns([1.25, 1])
         with c_seg:
@@ -343,27 +451,47 @@ def render() -> None:
                 st.caption("Gunakan data konsentrasi sektor untuk memandu sampling pemeriksaan audit kepatuhan.")
 
         with c_comm:
-            st.markdown("##### 🕸️ 6 Komunitas Risiko Terbesar (Jejaring Kolusi)")
             st.markdown(
-                "<div class='small-note' style='margin-bottom: 8px;'>"
-                "Kelompok pegawai dengan intensitas persetujuan kredit mencurigakan dan hubungan berulang yang tidak wajar."
-                "</div>",
+                """<div style='margin-bottom: 8px; font-weight: 700; font-size: 1.05rem; color: #1e3a8a;'>Unit dengan Risiko Tertinggi</div>""",
                 unsafe_allow_html=True,
             )
-            communities = services.table("communities").head(6)
+            # Aggregate unit risk metrics
+            unit_agg = (
+                high.groupby("requester_unit")
+                .agg(
+                    n_berisiko=("request_id", "count"),
+                    potensi_m=("amount", lambda s: s.sum() / 1e9),
+                )
+                .reset_index()
+                .sort_values("potensi_m", ascending=False)
+                .head(5)
+            )
+
+            # Build monthly trend array for each unit (sparkline)
+            m_units = (
+                high.groupby(["requester_unit", high["event_time"].dt.month])["request_id"]
+                .count()
+                .unstack(fill_value=0)
+            )
+            unit_agg["tren"] = unit_agg["requester_unit"].apply(
+                lambda u: m_units.loc[u].tolist() if u in m_units.index else [1, 2, 3]
+            )
+            unit_agg["rank"] = range(1, len(unit_agg) + 1)
+
             st.dataframe(
-                communities[["community_id", "skor_komunitas", "anggota", "unit", "aktif_bulan"]],
+                unit_agg[["rank", "requester_unit", "n_berisiko", "potensi_m", "tren"]],
                 hide_index=True,
                 use_container_width=True,
+                height=260,
                 column_config={
-                    "community_id": "ID Klaster",
-                    "skor_komunitas": st.column_config.ProgressColumn("Skor Risiko", min_value=0, max_value=100, format="%.0f"),
-                    "anggota": "Jml Pegawai",
-                    "unit": "Unit Utama",
-                    "aktif_bulan": "Bulan Aktif",
+                    "rank": st.column_config.NumberColumn("#", format="%d", width="small"),
+                    "requester_unit": st.column_config.TextColumn("Unit", width="medium"),
+                    "n_berisiko": st.column_config.NumberColumn("Jumlah Transaksi Berisiko", format="%d"),
+                    "potensi_m": st.column_config.NumberColumn("Nilai Potensi Risiko (Rp M)", format="%.0f"),
+                    "tren": st.column_config.LineChartColumn("Tren", width="medium"),
                 },
             )
-            st.caption("Detail interaktif visualisasi jejaring antar-pegawai dapat dilihat pada menu **Peta Jaringan & Komplotan**.")
+            st.caption("Peringkat unit/cabang dengan eksposur potensi risiko tertinggi beserta tren fluktuasi bulanan.")
 
     with tab_branch:
         u_frame = unit_risk[unit_risk["year"] == year].copy()

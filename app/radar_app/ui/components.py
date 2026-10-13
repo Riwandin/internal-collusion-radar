@@ -63,6 +63,24 @@ CSS = f"""
     padding: 10px 14px;
     margin-bottom: 8px;
 }}
+.exec-card {{
+    background: white;
+    border: 1px solid {GRID};
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.03);
+    height: 100%;
+}}
+.exec-stat-box {{
+    background: white;
+    border: 1px solid {GRID};
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+}}
 .reason-title {{font-weight: 700; font-size: .9rem; color: {INK};}}
 .reason-detail {{font-size: .84rem; color: {INK_SECONDARY}; margin-top: 2px;}}
 </style>
