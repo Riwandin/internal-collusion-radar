@@ -27,8 +27,12 @@ pio.templates.default = "radar"
 CSS = f"""
 <style>
 .block-container {{padding-top: 1.4rem; padding-bottom: 2.2rem;}}
-.kpi-card {{background: white; border: 1px solid {GRID}; border-radius: 12px; padding: 14px 16px; height: 100%;
+.kpi-card {{background: white; border: 1px solid {GRID}; border-radius: 12px; padding: 14px 16px; min-height: 108px; height: 100%;
+           box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;
            box-shadow: 0 1px 2px rgba(0,0,0,.04);}}
+[data-testid="column"] {{display: flex; flex-direction: column;}}
+[data-testid="column"] > div {{flex: 1; display: flex; flex-direction: column;}}
+[data-testid="column"] .kpi-card {{flex: 1;}}
 .kpi-label {{font-size: .78rem; color: {INK_SECONDARY}; text-transform: uppercase; letter-spacing: .03em;}}
 .kpi-value {{font-size: 1.55rem; font-weight: 700; color: {INK}; line-height: 1.25; margin-top: 2px;}}
 .kpi-sub {{font-size: .78rem; color: {MUTED}; margin-top: 2px;}}
