@@ -10,7 +10,12 @@ from ..ui import components as ui
 from ..ui import services
 
 RED_FLAG_COLUMNS = list(ui.RED_FLAG_LABELS)
-DECISIONS = ["Tindak lanjut / eskalasi", "Bukan kolusi (alarm palsu)", "Perlu data tambahan"]
+DECISIONS = [
+    "🚨 Tindak lanjut / eskalasi audit",
+    "⏸️ Tahan pencairan sementara",
+    "📞 Perlu klarifikasi / data tambahan",
+    "✅ Aman / bukan kolusi (alarm palsu)",
+]
 
 
 def latest_decisions() -> pd.DataFrame:
