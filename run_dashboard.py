@@ -15,8 +15,14 @@ def main():
     app_path = root / "app" / "streamlit_app.py"
 
     # Prioritas binary streamlit
+    venv_streamlit = root / ".venv" / "bin" / "streamlit"
+    root_venv_streamlit = root.parent / ".venv" / "bin" / "streamlit"
     bootcamp_streamlit = Path("/Users/wandi/miniforge3/envs/bootcamp/bin/streamlit")
-    if bootcamp_streamlit.exists() and os.access(bootcamp_streamlit, os.X_OK):
+    if venv_streamlit.exists() and os.access(venv_streamlit, os.X_OK):
+        streamlit_exec = str(venv_streamlit)
+    elif root_venv_streamlit.exists() and os.access(root_venv_streamlit, os.X_OK):
+        streamlit_exec = str(root_venv_streamlit)
+    elif bootcamp_streamlit.exists() and os.access(bootcamp_streamlit, os.X_OK):
         streamlit_exec = str(bootcamp_streamlit)
     else:
         streamlit_exec = "streamlit"
@@ -39,7 +45,9 @@ def main():
         "--server.port",
         "8501",
         "--server.address",
-        "localhost"
+        "localhost",
+        "--server.headless",
+        "true"
     ]
 
     try:

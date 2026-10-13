@@ -12,23 +12,58 @@ from ..ui import services
 from ..ui.network import LEGEND_HTML, build_graph, plotly_network, pyvis_html
 
 
+def latest_anomaly_scores() -> pd.Series:
+    anomaly = services.table("approver_anomaly")
+    if anomaly.empty:
+        return pd.Series(dtype=float)
+    return anomaly[anomaly["month"] == anomaly["month"].max()].set_index("approver_id")["if_score"]
+
+
+def show_graph(graph, title: str, height: int = 540) -> None:
+    """Graph interaktif PyVis (cadangan: Plotly) beserta legenda."""
+    st.markdown(LEGEND_HTML, unsafe_allow_html=True)
+    html = pyvis_html(graph, height=height)
+    if html:
+        components.html(html, height=height + 20)
+    else:
+        st.plotly_chart(plotly_network(graph, title), use_container_width=True)
+
+
+def community_graph(community_id: int, include_context: bool = False):
+    """Graph satu komunitas risiko; opsional ditambah hubungan normal anggotanya (konteks)."""
+    edges, members = services.table("community_edges"), services.table("community_members")
+    people = set(members.loc[members["community_id"] == community_id, "employee_id"])
+    community_edges = edges[(edges["community_a"] == community_id) & (edges["community_b"] == community_id)]
+    frame_edges = community_edges[["node_a", "node_b", "weight", "kind", "redflag", "dependency", "n_tx", "z", "shared"]]
+    if include_context:
+        pairs = services.table("pair_network")
+        normal = pairs[(pairs["requester_id"].isin(people) | pairs["approver_id"].isin(people))
+                       & ~pairs["risky"].astype(str).str.lower().eq("true")].nlargest(25, "n")
+        frame_edges = pd.concat([frame_edges, pd.DataFrame({"node_a": normal["requester_id"], "node_b": normal["approver_id"],
+                                                             "weight": 0.5, "kind": "RA", "redflag": False, "dependency": False,
+                                                             "n_tx": normal["n"], "z": normal["z"]})], ignore_index=True)
+    return build_graph(frame_edges, services.table("employees"), highlight=people, node_scores=latest_anomaly_scores().to_dict())
+
+
 def render() -> None:
     user = services.current_user()
     ui.page_header("Jaringan Risiko", "Lingkaran pegawai yang hubungannya menyimpang (graph analytics, tanpa label, 12 bulan terakhir)")
     communities, members = services.table("communities"), services.table("community_members")
-    edges, history = services.table("community_edges"), services.table("community_history")
-    anomaly = services.table("approver_anomaly")
+    history = services.table("community_history")
     if communities.empty:
         ui.empty_state("Belum ada komunitas risiko.")
         return
-    with st.sidebar:
-        st.markdown("**Filter komunitas**")
-        priorities = st.multiselect("Prioritas", ["Tinggi", "Sedang", "Rendah"], default=["Tinggi", "Sedang", "Rendah"], key="net_prio")
-        unit_query = st.text_input("Unit mengandung", key="net_unit")
-        min_members = st.slider("Anggota minimal", 3, int(max(communities["anggota"].max(), 3)), 3, key="net_min")
+    search_column, priority_column, members_column = st.columns([2, 1.5, 1.2])
+    unit_query = search_column.text_input("🔎 Cari unit / approver utama", key="net_unit", placeholder="mis. Bekasi atau E00292")
+    priorities = priority_column.multiselect("Prioritas", ["Tinggi", "Sedang", "Rendah"], default=["Tinggi", "Sedang", "Rendah"], key="net_prio")
+    min_members = members_column.slider("Anggota minimal", 3, int(max(communities["anggota"].max(), 3)), 3, key="net_min")
     frame = communities[communities["prioritas"].isin(priorities) & (communities["anggota"] >= min_members)]
     if unit_query:
-        frame = frame[frame["unit"].str.contains(unit_query, case=False, na=False)]
+        frame = frame[frame["unit"].str.contains(unit_query, case=False, na=False, regex=False)
+                      | frame["approver_utama"].str.contains(unit_query, case=False, na=False, regex=False)]
+    if frame.empty:
+        st.info("Tidak ada komunitas yang cocok dengan filter.")
+        return
     ui.kpi_row([("Komunitas risiko", ui.number(len(frame)), "≥ 3 orang, snapshot terbaru", ui.ORANGE),
                 ("Pegawai terlibat", ui.number(frame["anggota"].sum()), "", ui.BLUE),
                 ("Prioritas Tinggi", ui.number((frame["prioritas"] == "Tinggi").sum()), "kuartil skor teratas", ui.RED),
@@ -56,9 +91,7 @@ def render() -> None:
         "…atau pilih ID komunitas", frame["community_id"].tolist(), key="net_pick")
     info = communities[communities["community_id"] == community_id].iloc[0]
     group = members[members["community_id"] == community_id].copy()
-    latest_month = anomaly["month"].max() if len(anomaly) else None
-    latest_scores = anomaly[anomaly["month"] == latest_month].set_index("approver_id")["if_score"] if latest_month else pd.Series(dtype=float)
-    group["skor anomali (IF)"] = group["employee_id"].map(latest_scores)
+    group["skor anomali (IF)"] = group["employee_id"].map(latest_anomaly_scores())
     st.divider()
     st.markdown(f"### Komunitas {community_id} &nbsp; {ui.badge('prioritas ' + info['prioritas'], ui.ORANGE if info['prioritas'] == 'Tinggi' else ui.YELLOW)}",
                 unsafe_allow_html=True)
@@ -71,24 +104,7 @@ def render() -> None:
     graph_column, members_column = st.columns([1.5, 1])
     with graph_column:
         include_context = st.toggle("Tampilkan juga hubungan normal anggota (12 bulan)", value=False, key="net_context")
-        community_edges = edges[(edges["community_a"] == community_id) & (edges["community_b"] == community_id)]
-        frame_edges = community_edges[["node_a", "node_b", "weight", "kind", "redflag", "dependency", "n_tx", "z", "shared"]]
-        if include_context:
-            pairs = services.table("pair_network")
-            people = set(group["employee_id"])
-            normal = pairs[(pairs["requester_id"].isin(people) | pairs["approver_id"].isin(people))
-                           & ~pairs["risky"].astype(str).str.lower().eq("true")].nlargest(25, "n")
-            frame_edges = pd.concat([frame_edges, pd.DataFrame({"node_a": normal["requester_id"], "node_b": normal["approver_id"],
-                                                                 "weight": 0.5, "kind": "RA", "redflag": False, "dependency": False,
-                                                                 "n_tx": normal["n"], "z": normal["z"]})], ignore_index=True)
-        graph = build_graph(frame_edges, services.table("employees"), highlight=set(group["employee_id"]),
-                            node_scores=latest_scores.to_dict())
-        st.markdown(LEGEND_HTML, unsafe_allow_html=True)
-        html = pyvis_html(graph, height=540)
-        if html:
-            components.html(html, height=560)
-        else:
-            st.plotly_chart(plotly_network(graph, f"Komunitas {community_id}"), use_container_width=True)
+        show_graph(community_graph(community_id, include_context), f"Komunitas {community_id}")
     with members_column:
         st.markdown("**Anggota komunitas**")
         st.dataframe(group[["employee_name", "employee_id", "role", "position", "unit", "pagerank", "skor anomali (IF)", "aktif_bulan"]],

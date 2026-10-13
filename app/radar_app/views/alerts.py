@@ -1,4 +1,4 @@
-"""Investigator · Monitoring Alert: filter → scorecard → tabel → detail alert → keputusan (human-in-the-loop)."""
+"""Investigator · Detail Kasus: cari kasus → scorecard → alasan skor → jaringan kasus → riwayat → keputusan & memo AI."""
 from __future__ import annotations
 
 import networkx as nx
@@ -7,45 +7,48 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 from ..ui import components as ui
 from ..ui import services
-from ..ui.network import LEGEND_HTML, build_graph, plotly_network, pyvis_html
-from .common import DECISIONS, RED_FLAG_COLUMNS, flags_text, latest_decisions, show_guard_checks
+from ..ui.network import build_graph
+from .common import DECISIONS, RED_FLAG_COLUMNS, latest_decisions, show_guard_checks
+from .inv_overview import search_mask
+from .network import community_graph, latest_anomaly_scores, show_graph
 
 
-def filter_alerts(transactions: pd.DataFrame) -> pd.DataFrame:
-    frame = services.period_filter(transactions, "alerts", default_year=2026)
-    with st.sidebar:
-        st.markdown("**Filter alert**")
-        levels = st.multiselect("Level risiko", ["Tinggi", "Sedang", "Rendah"], default=["Tinggi", "Sedang"], key="alert_levels")
-        flag_labels = st.multiselect("Red flag", list(ui.RED_FLAG_LABELS.values()), key="alert_flags")
-        flag_logic = st.radio("Logika red flag", ["minimal satu", "semua terpilih"], horizontal=True, key="alert_flag_logic")
-        units = st.multiselect("Unit (requester/approver)", sorted(set(frame["requester_unit"].dropna()) | set(frame["approver_unit"].dropna())),
-                               key="alert_units")
-        employee_query = st.text_input("Nama / ID pegawai", key="alert_employee", placeholder="mis. Gita atau E00747")
-        score_range = st.slider("Rentang skor risiko", 0, 100, (0, 100), key="alert_score")
-        status = st.radio("Status keputusan", ["semua", "belum diputus", "sudah diputus"], key="alert_status")
-    frame = frame[frame["risk_band"].isin(levels)] if levels else frame
-    if flag_labels:
-        columns = [c for c, label in ui.RED_FLAG_LABELS.items() if label in flag_labels]
-        mask = frame[columns].eq(1).all(axis=1) if flag_logic == "semua terpilih" else frame[columns].eq(1).any(axis=1)
-        frame = frame[mask]
+def select_case(transactions: pd.DataFrame, decisions: pd.DataFrame) -> pd.Series | None:
+    """Pencarian & filter di atas → satu kasus terpilih (default: kasus yang dibuka dari Overview)."""
+    query = st.text_input("🔎 Cari kasus", key="case_search", placeholder="ID transaksi, nama, atau ID pegawai")
+    c_level, c_status, c_unit, c_pick = st.columns([1.1, 1.1, 1.4, 2.4])
+    levels = c_level.multiselect("Level risiko", ["Tinggi", "Sedang"], default=["Tinggi", "Sedang"], key="case_levels")
+    status = c_status.selectbox("Status keputusan", ["semua", "belum diputus", "sudah diputus"], key="case_status")
+    frame = transactions[transactions["risk_band"].isin(levels or ["Tinggi", "Sedang"])]
+    units = c_unit.multiselect("Unit kerja", sorted(frame["requester_unit"].dropna().unique()), key="case_units")
     if units:
-        frame = frame[frame["requester_unit"].isin(units) | frame["approver_unit"].isin(units)]
-    if employee_query:
-        employees = services.table("employees")
-        matched = employees[employees["employee_name"].str.contains(employee_query, case=False, na=False)
-                            | employees["employee_id"].str.upper().eq(employee_query.strip().upper())]["employee_id"]
-        frame = frame[frame["requester_id"].isin(matched) | frame["approver_id"].isin(matched)]
-    frame = frame[frame["risk_score"].between(*score_range)]
-    decisions = latest_decisions()
+        frame = frame[frame["requester_unit"].isin(units)]
     if status == "belum diputus":
         frame = frame[~frame["request_id"].isin(decisions.index)]
     elif status == "sudah diputus":
         frame = frame[frame["request_id"].isin(decisions.index)]
-    return frame
+    opened = st.session_state.get("case_id")
+    if query.strip():
+        frame = frame[search_mask(frame, query)]
+        if query.strip().upper() in set(transactions["request_id"]):
+            opened = query.strip().upper()
+    options = frame.sort_values(["risk_score", "event_time"], ascending=False)["request_id"].head(500).tolist()
+    if opened in set(transactions["request_id"]) and opened not in options:
+        options.insert(0, opened)
+    if not options:
+        c_pick.selectbox("Pilih kasus", ["(tidak ada yang cocok)"], disabled=True)
+        return None
+    names = services.name_map()
+    rows = transactions.set_index("request_id")
+    request_id = c_pick.selectbox(
+        "Pilih kasus", options, index=options.index(opened) if opened in options else 0, key="case_pick",
+        format_func=lambda r: f"{r} · skor {rows.at[r, 'risk_score']:.0f} · {names.get(rows.at[r, 'requester_id'], '?')} → "
+                              f"{names.get(rows.at[r, 'approver_id'], '?')}")
+    st.session_state["case_id"] = request_id
+    return transactions[transactions["request_id"] == request_id].iloc[0]
 
 
 def score_gauge(score: float, threshold: float) -> go.Figure:
@@ -117,7 +120,7 @@ def render_detail(row: pd.Series, settings: dict) -> None:
         if pd.notna(anomaly_score):
             st.markdown(f"**Skor anomali approver (IF, model terpisah):** {anomaly_score:.0f}/100")
         st.caption("Skor adalah indikasi berbasis data, bukan bukti. Keputusan ada di tangan investigator.")
-    tab_history, tab_network, tab_decision, tab_memo = st.tabs(["Riwayat pasangan", "Jaringan", "Keputusan", "Draf memo (agen AI)"])
+    tab_network, tab_history, tab_decision, tab_memo = st.tabs(["① Jaringan kasus", "② Riwayat pasangan", "③ Keputusan", "④ Draf memo (agen AI)"])
     with tab_history:
         transactions = services.table("transactions_scored")
         pair = transactions[(transactions["requester_id"] == row["requester_id"]) & (transactions["approver_id"] == row["approver_id"])]
@@ -132,16 +135,14 @@ def render_detail(row: pd.Series, settings: dict) -> None:
                    "debitur sama ≤ 1 thn": ui.number(row.get("debtor_loans_1y"))}
         ui.kpi_row([(k, v, "", ui.PURPLE) for k, v in summary.items()])
     with tab_network:
+        st.caption("Jaringan kasus = hubungan requester & approver kasus ini dengan pegawai lain (graph 12 bulan terakhir). "
+                   "Garis oranye/ungu menandakan hubungan menyimpang; garis putus-putus = berbagi debitur.")
         graph = ego_network(row)
         if graph is None:
             st.info("Pasangan ini belum punya riwayat di snapshot graph terbaru.")
         else:
-            st.markdown(LEGEND_HTML, unsafe_allow_html=True)
-            html = pyvis_html(graph, height=480)
-            if html:
-                components.html(html, height=500)
-            else:
-                st.plotly_chart(plotly_network(graph, "Jaringan di sekitar pasangan ini"), use_container_width=True)
+            show_graph(graph, "Jaringan di sekitar pasangan ini", height=480)
+        render_case_community(row)
     with tab_decision:
         user = services.current_user()
         decisions = latest_decisions()
@@ -183,46 +184,60 @@ def render_detail(row: pd.Series, settings: dict) -> None:
                 show_guard_checks(result["checks"])
 
 
+def render_case_community(row: pd.Series) -> None:
+    """Komunitas risiko tempat requester/approver kasus ini berada (hasil graph analytics)."""
+    members, communities = services.table("community_members"), services.table("communities")
+    people = {row["requester_id"], row["approver_id"]}
+    ids = sorted(members.loc[members["employee_id"].isin(people), "community_id"].unique())
+    if not ids:
+        st.caption("Requester/approver kasus ini tidak termasuk komunitas risiko mana pun.")
+        return
+    st.markdown("**Komunitas risiko yang terkait kasus ini**")
+    st.dataframe(communities[communities["community_id"].isin(ids)][["community_id", "skor_komunitas", "prioritas", "anggota",
+                                                                     "approver_utama", "unit", "aktif_bulan"]],
+                 hide_index=True, use_container_width=True,
+                 column_config={"skor_komunitas": st.column_config.ProgressColumn("skor", min_value=0, max_value=100, format="%.0f"),
+                                "community_id": "ID", "aktif_bulan": "aktif (bln)"})
+    community_id = st.selectbox("Lihat graph komunitas", ids, key=f"case_comm_{row['request_id']}")
+    group = members[members["community_id"] == community_id].copy()
+    group["skor anomali (IF)"] = group["employee_id"].map(latest_anomaly_scores())
+    graph_column, members_column = st.columns([1.5, 1])
+    with graph_column:
+        show_graph(community_graph(community_id), f"Komunitas {community_id}", height=440)
+    members_column.dataframe(group[["employee_name", "employee_id", "role", "unit", "pagerank", "skor anomali (IF)"]],
+                             hide_index=True, use_container_width=True, height=440,
+                             column_config={"employee_name": "nama",
+                                            "pagerank": st.column_config.NumberColumn("sentralitas", format="%.2f"),
+                                            "skor anomali (IF)": st.column_config.NumberColumn(format="%.0f")})
+
+
 def render() -> None:
-    ui.page_header("Monitoring Alert", "Saring alert berdasarkan level risiko, red flag, unit, pegawai, dan skor; buka detail; catat keputusan")
+    ui.page_header("Detail Kasus", "Alur: cari kasus → pahami alasan skor → periksa jaringan kasus → catat keputusan & setujui memo")
     transactions = services.table("transactions_scored")
     if transactions.empty:
         ui.empty_state("Data belum tersedia.")
         return
     settings = services.app_settings()
-    frame = filter_alerts(transactions)
     decisions = latest_decisions()
-    ui.kpi_row([("Alert sesuai filter", ui.number(len(frame)), st.session_state.get("alerts_period_label", ""), ui.BLUE),
-                ("Tinggi", ui.number((frame["risk_band"] == "Tinggi").sum()), "", ui.ORANGE),
-                ("Nominal", ui.rupiah(frame["amount"].sum()), "total kredit pada alert", ui.YELLOW),
-                ("Skor rata-rata", ui.number(frame["risk_score"].mean(), 1) if len(frame) else "-", "0–100", ui.PURPLE),
-                ("Approver unik", ui.number(frame["approver_id"].nunique()), "", ui.GREEN),
-                ("Belum diputus", ui.number((~frame["request_id"].isin(decisions.index)).sum()), "", ui.RED)])
-    st.write("")
-    names = services.name_map()
-    table = frame.sort_values(["risk_score", "event_time"], ascending=False).head(500).copy()
-    table["requester"] = table["requester_id"].map(names)
-    table["approver"] = table["approver_id"].map(names)
-    table["red flag"] = table.apply(flags_text, axis=1)
-    table["status"] = np.where(table["request_id"].isin(decisions.index), "diputus", "belum")
-    table["nominal"] = table["amount"].map(ui.rupiah)
-    table["alasan utama"] = table["top_reasons"].fillna("").str.split(" | ").str[0]
-    st.caption(f"Menampilkan {len(table):,} dari {len(frame):,} alert (urut skor tertinggi). Klik satu baris untuk membuka detail.")
-    selection = st.dataframe(
-        table[["request_id", "event_time", "requester", "approver", "requester_unit", "nominal", "risk_score", "risk_band",
-               "red flag", "status", "alasan utama"]],
-        hide_index=True, use_container_width=True, height=360, on_select="rerun", selection_mode="single-row", key="alert_table",
-        column_config={"risk_score": st.column_config.ProgressColumn("skor", min_value=0, max_value=100, format="%.0f"),
-                       "event_time": st.column_config.DatetimeColumn("waktu", format="DD MMM YYYY HH:mm"),
-                       "requester_unit": "unit", "risk_band": "level"})
-    selected_rows = getattr(getattr(selection, "selection", None), "rows", []) or []
-    if len(table) == 0:
+    row = select_case(transactions, decisions)
+    if row is None:
+        st.info("Tidak ada kasus yang cocok dengan pencarian/filter.")
         return
-    st.download_button("Unduh hasil filter (CSV)", table.drop(columns=["top_reasons"], errors="ignore").to_csv(index=False),
-                       "alert_terfilter.csv", "text/csv")
-    selected = table.iloc[selected_rows[0]] if selected_rows else None
-    if selected is None:
-        request_id = st.selectbox("…atau pilih ID transaksi", table["request_id"].tolist(), key="alert_pick")
-        selected = table[table["request_id"] == request_id].iloc[0]
+    flags = [c for c in RED_FLAG_COLUMNS if row.get(c) == 1]
+    decision = decisions["decision"].get(row["request_id"], "Belum diputus")
+    anomaly_score = row.get("approver_anomaly_score")
+    ui.kpi_row([("Skor risiko", f"{row['risk_score']:.0f}/100", f"level {row['risk_band']}", ui.BAND_COLORS.get(row["risk_band"], ui.BLUE)),
+                ("Nominal kredit", ui.rupiah(row["amount"]), f"{ui.percent(row['limit_ratio'])} limit approver", ui.YELLOW),
+                ("Estimasi potensi kerugian", ui.rupiah(row["amount"] * row["risk_probability"] * settings.get("lgd", 0.6)),
+                 "nominal × probabilitas × LGD", ui.PURPLE),
+                ("Red flag terpenuhi", f"{len(flags)}/{len(RED_FLAG_COLUMNS)}", "rules bisnis", ui.ORANGE),
+                ("Skor anomali approver", f"{anomaly_score:.0f}/100" if pd.notna(anomaly_score) else "-", "Isolation Forest", ui.GREEN),
+                ("Status keputusan", decision.split(" (")[0], "tab ③ Keputusan", ui.RED if decision == "Belum diputus" else ui.BLUE)])
+    ui.explain({
+        "Skor risiko": "probabilitas kolusi dari model (×100). Garis oranye pada gauge = ambang alert Tinggi.",
+        "Tiga alasan utama (SHAP)": "fitur yang paling menaikkan skor kasus ini; warna = kelompok fitur (transaksi, riwayat, rules, graph).",
+        "Red flag": "aturan bisnis yang terpenuhi; berdiri sendiri bukan bukti, tetapi menguatkan alasan model.",
+        "Skor anomali approver": "seberapa menyimpang perilaku approver dibanding rekan sejabatan (model terpisah, tanpa label).",
+        "Jaringan kasus": "siapa saja yang terhubung dengan pasangan ini dan apakah mereka berada di komunitas risiko."})
     st.divider()
-    render_detail(selected, settings)
+    render_detail(row, settings)

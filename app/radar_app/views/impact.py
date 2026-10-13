@@ -14,13 +14,12 @@ from ..ui import services
 def render() -> None:
     ui.page_header("Dampak Bisnis", "Estimasi transparan: ubah asumsi, angka dihitung ulang langsung")
     settings = services.app_settings()
-    with st.sidebar:
-        st.markdown("**Asumsi**")
-        lgd = st.slider("LGD (kerugian saat macet)", 0.2, 1.0, float(settings.get("lgd", 0.6)), 0.05)
-        prevention = st.slider("% alert benar yang berhasil dicegah", 0.2, 1.0, float(settings.get("prevention_rate", 0.75)), 0.05)
-        hours = st.slider("Jam investigasi per alert", 0.5, 8.0, float(settings.get("audit_hours_per_alert", 2.0)), 0.5)
-        cost = st.number_input("Biaya per jam investigator (Rp)", 50_000, 1_000_000, int(settings.get("investigator_cost_per_hour", 150_000)), 10_000)
-        system_cost = st.number_input("Biaya sistem per tahun (Rp, opsional)", 0, 20_000_000_000, 750_000_000, 50_000_000)
+    c_lgd, c_prevention, c_hours, c_cost, c_system = st.columns(5)
+    lgd = c_lgd.slider("LGD (kerugian saat macet)", 0.2, 1.0, float(settings.get("lgd", 0.6)), 0.05)
+    prevention = c_prevention.slider("% alert benar yang berhasil dicegah", 0.2, 1.0, float(settings.get("prevention_rate", 0.75)), 0.05)
+    hours = c_hours.slider("Jam investigasi per alert", 0.5, 8.0, float(settings.get("audit_hours_per_alert", 2.0)), 0.5)
+    cost = c_cost.number_input("Biaya per jam investigator (Rp)", 50_000, 1_000_000, int(settings.get("investigator_cost_per_hour", 150_000)), 10_000)
+    system_cost = c_system.number_input("Biaya sistem per tahun (Rp)", 0, 20_000_000_000, 750_000_000, 50_000_000)
     base_loss = settings.get("loss_per_fraud", 0) / max(settings.get("lgd", 0.6), 1e-9)
     fraud_per_year = settings.get("fraud_cases_per_year", 0)
     scenarios = {"Rules saja": (settings.get("rules_test_recall", 0), settings.get("rules_alerts_per_month", 0)),
@@ -46,7 +45,7 @@ def render() -> None:
     for column, color in [("kerugian dicegah", ui.GREEN), ("biaya pemeriksaan", ui.YELLOW), ("biaya sistem", ui.MUTED), ("manfaat bersih", ui.BLUE)]:
         figure.add_bar(x=table.index, y=table[column] / 1e9, name=column, marker_color=color)
     figure.update_layout(barmode="group", yaxis_title="Rp miliar / tahun")
-    left.plotly_chart(ui.style_figure(figure, "Model vs rules", "asumsi di sidebar"), use_container_width=True)
+    left.plotly_chart(ui.style_figure(figure, "Model vs rules", "asumsi di bagian atas"), use_container_width=True)
     grid = pd.DataFrame([[fraud_per_year * model["recall"] * p * base_loss * l - model["biaya pemeriksaan"] - model["biaya sistem"]
                           for l in (0.4, 0.6, 0.8)] for p in (0.5, 0.75, 1.0)],
                         index=["50% dicegah", "75% dicegah", "100% dicegah"], columns=["LGD 40%", "LGD 60%", "LGD 80%"])

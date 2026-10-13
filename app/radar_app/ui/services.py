@@ -99,18 +99,27 @@ def current_user() -> dict:
     return st.session_state.get("user", {"username": "-", "display_name": "-", "role": "investigator"})
 
 
-def period_filter(frame: pd.DataFrame, key: str, default_year: int | None = None) -> pd.DataFrame:
-    """Filter periode di sidebar (tahun + rentang bulan) untuk tabel transaksi."""
+def unit_region() -> dict:
+    """Peta unit kerja → region (dari tabel pegawai)."""
+    employees = table("employees")
+    return employees.drop_duplicates("unit_name").set_index("unit_name")["region"].fillna("Lainnya").to_dict()
+
+
+def period_filter(frame: pd.DataFrame, key: str, default_year: int | None = None, columns=None) -> pd.DataFrame:
+    """Filter periode di bagian atas halaman (tahun + rentang bulan) untuk tabel transaksi."""
     years = sorted(frame["event_time"].dt.year.dropna().unique().astype(int))
     if not years:
         return frame
+    year_column, month_column = columns if columns else st.columns([1, 2])
     default_year = default_year if default_year in years else years[-1]
-    with st.sidebar:
-        st.markdown("**Periode**")
-        year = st.selectbox("Tahun", years, index=years.index(default_year), key=f"{key}_year")
-        months = sorted(frame.loc[frame["event_time"].dt.year == year, "event_time"].dt.month.unique().astype(int))
-        month_range = st.select_slider("Bulan", options=months, value=(months[0], months[-1]), key=f"{key}_months") \
-            if len(months) > 1 else (months[0], months[0])
+    year = year_column.selectbox("Tahun", years, index=years.index(default_year), key=f"{key}_year")
+    months = sorted(frame.loc[frame["event_time"].dt.year == year, "event_time"].dt.month.unique().astype(int))
+    month_range = month_column.select_slider("Bulan", options=months, value=(months[0], months[-1]), key=f"{key}_months") \
+        if len(months) > 1 else (months[0], months[0])
     mask = (frame["event_time"].dt.year == year) & frame["event_time"].dt.month.between(*month_range)
     st.session_state[f"{key}_period_label"] = f"{year}, bulan {month_range[0]}–{month_range[1]}"
     return frame[mask]
+
+
+# Halaman st.Page yang sedang aktif (diisi streamlit_app.py) supaya halaman bisa saling membuka via st.switch_page.
+PAGES: dict = {}

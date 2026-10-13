@@ -14,9 +14,22 @@ def render() -> None:
     ui.page_header("Risiko Unit & Wilayah", "Di mana risiko terkonsentrasi, untuk alokasi pengawasan dan kapasitas investigasi")
     transactions = services.table("transactions_scored")
     unit_risk = services.table("unit_risk")
-    year = st.sidebar.selectbox("Tahun", sorted(unit_risk["year"].unique().astype(int), reverse=True), key="unit_year")
+    year_column, region_column = st.columns([1, 2])
+    year = year_column.selectbox("Tahun", sorted(unit_risk["year"].unique().astype(int), reverse=True), key="unit_year")
     frame = unit_risk[unit_risk["year"] == year].copy()
     frame["region"] = frame["region"].fillna("Lainnya")
+    regions = region_column.multiselect("Region", sorted(frame["region"].unique()), key="unit_regions", placeholder="Semua region")
+    if regions:
+        frame = frame[frame["region"].isin(regions)]
+    ui.kpi_row([("Transaksi", ui.number(frame["transaksi"].sum()), f"{year} · {frame['requester_unit'].nunique()} unit", ui.BLUE),
+                ("Alert Tinggi", ui.number(frame["alert_tinggi"].sum()), ui.percent(frame["alert_tinggi"].sum() / max(frame["transaksi"].sum(), 1), 1) + " dari transaksi", ui.ORANGE),
+                ("Nominal kredit", ui.rupiah(frame["nominal"].sum()), "seluruh transaksi", ui.YELLOW),
+                ("Unit dengan % alert > rata-rata", ui.number((frame["alert_rate"] > frame["alert_rate"].mean()).sum()), "kandidat prioritas pengawasan", ui.RED),
+                ("Region paling berisiko", frame.groupby("region")["alert_tinggi"].sum().div(frame.groupby("region")["transaksi"].sum()).idxmax() if len(frame) else "-",
+                 "% alert Tinggi tertinggi", ui.PURPLE)])
+    ui.explain({"% alert": "alert Tinggi ÷ transaksi pada unit/region; menormalkan perbedaan volume antar unit.",
+                "Peta risiko": "kotak besar = volume transaksi besar; warna makin oranye = proporsi alert makin tinggi.",
+                "Detail unit": "pilih unit di bawah untuk melihat tren dan red flag yang dominan sebagai fokus pengawasan."})
     left, right = st.columns([1.3, 1])
     figure = px.treemap(frame, path=["region", "requester_unit"], values="transaksi", color="alert_rate",
                         color_continuous_scale=["#eef4fc", "#f3c35a", ui.ORANGE], hover_data={"alert_tinggi": True, "skor_rata": ":.1f"})

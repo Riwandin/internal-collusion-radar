@@ -8,14 +8,18 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
-# Gunakan environment conda bootcamp yang memiliki dependensi lengkap
-if [ -x "/Users/wandi/miniforge3/envs/bootcamp/bin/streamlit" ]; then
+# Prioritas executable streamlit dari virtual environment (.venv)
+if [ -x "$PROJECT_DIR/.venv/bin/streamlit" ]; then
+    STREAMLIT_EXEC="$PROJECT_DIR/.venv/bin/streamlit"
+elif [ -x "$PROJECT_DIR/../.venv/bin/streamlit" ]; then
+    STREAMLIT_EXEC="$PROJECT_DIR/../.venv/bin/streamlit"
+elif [ -x "/Users/wandi/miniforge3/envs/bootcamp/bin/streamlit" ]; then
     STREAMLIT_EXEC="/Users/wandi/miniforge3/envs/bootcamp/bin/streamlit"
 elif command -v streamlit >/dev/null 2>&1; then
     STREAMLIT_EXEC="$(command -v streamlit)"
 else
     echo "❌ Error: Streamlit tidak ditemukan."
-    echo "Aktifkan conda environment dengan: conda activate bootcamp"
+    echo "Aktifkan virtual environment dengan: source .venv/bin/activate"
     exit 1
 fi
 
@@ -32,5 +36,5 @@ echo "  • Akses URL      : http://localhost:8501"
 echo "=================================================================="
 echo ""
 
-exec "$STREAMLIT_EXEC" run app/streamlit_app.py --server.port 8501 --server.address localhost
+exec "$STREAMLIT_EXEC" run app/streamlit_app.py --server.port 8501 --server.address localhost --server.headless true
 

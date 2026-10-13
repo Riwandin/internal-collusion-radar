@@ -16,8 +16,13 @@ def render() -> None:
     ui.page_header("Ringkasan Eksekutif", "Seberapa besar risiko kolusi, apakah sistem bekerja, dan berapa nilainya bagi bank")
     settings = services.app_settings()
     transactions = services.table("transactions_scored")
-    year = st.sidebar.selectbox("Tahun", sorted(transactions["event_time"].dt.year.unique().astype(int), reverse=True), key="exec_year")
+    regions_map = services.unit_region()
+    year_column, region_column = st.columns([1, 2])
+    year = year_column.selectbox("Tahun", sorted(transactions["event_time"].dt.year.unique().astype(int), reverse=True), key="exec_year")
+    regions = region_column.multiselect("Region", sorted(set(regions_map.values())), key="exec_regions", placeholder="Semua region")
     frame = transactions[transactions["event_time"].dt.year == year]
+    if regions:
+        frame = frame[frame["requester_unit"].map(regions_map).isin(regions)]
     months = max(frame["event_time"].dt.to_period("M").nunique(), 1)
     high = frame[frame["risk_band"] == "Tinggi"]
     reviewed = high[high["reviewed"].astype(str).str.lower().eq("true")]
@@ -29,14 +34,19 @@ def render() -> None:
     model_impact = impact[impact["skenario"].str.startswith("Model")].iloc[0] if len(impact) else None
     decisions = latest_decisions()
     backlog = int((~high["request_id"].isin(decisions.index)).sum())
+    alerts = frame[frame["risk_band"].isin(["Tinggi", "Sedang"])]
     ui.kpi_row([
-        ("Transaksi dinilai", ui.number(len(frame)), f"{year} · {months} bulan · {ui.rupiah(frame['amount'].sum())}", ui.BLUE),
+        ("Total alert", ui.number(len(alerts)), f"Tinggi {ui.number(len(high))} · Sedang {ui.number(len(alerts) - len(high))} · dari {ui.number(len(frame))} transaksi", ui.BLUE),
         ("Alert Tinggi / bulan", ui.number(len(high) / months, 0), f"rules: ±{ui.number((frame['rule_score'] >= settings.get('rules_threshold', 1)).sum() / months)}/bulan", ui.ORANGE),
         ("Nominal berisiko", ui.rupiah(high["amount"].sum()), "total kredit pada alert Tinggi", ui.RED),
         ("Precision populasi", f"{ui.percent(lower)}–{ui.percent(upper)}", "rentang (yang belum direview tidak diketahui)", ui.GREEN),
         ("Manfaat bersih/tahun", ui.rupiah(model_impact["manfaat bersih/tahun"]) if model_impact is not None else "-", "estimasi (lihat Dampak Bisnis)", ui.PURPLE),
         ("Backlog investigasi", ui.number(backlog), "alert Tinggi belum diputus", ui.YELLOW)])
-    st.write("")
+    ui.explain({"Total alert": "transaksi berlevel Tinggi (perlu investigasi) + Sedang (pantau) pada tahun & region terpilih.",
+                "Precision populasi": "batas bawah = alert benar yang sudah terkonfirmasi audit; batas atas = asumsi alert yang belum "
+                                      "direview punya precision sama dengan yang sudah direview.",
+                "Manfaat bersih/tahun": "kerugian yang dicegah − biaya pemeriksaan − biaya sistem (detail & asumsi di Dampak Bisnis).",
+                "Backlog investigasi": "alert Tinggi yang belum memiliki keputusan investigator."})
     with st.container(border=True):
         st.markdown("**Problem statement (dari data):** " + settings.get("problem_statement", "-"))
     kpis = services.table("monthly_kpis")
@@ -49,16 +59,21 @@ def render() -> None:
     figure.add_vrect(x0="2025-01", x1="2025-12", fillcolor=ui.YELLOW, opacity=.08, line_width=0, annotation_text="validasi")
     figure.add_vrect(x0="2026-01", x1=kpis["month"].max(), fillcolor=ui.GREEN, opacity=.08, line_width=0, annotation_text="test (out-of-sample)")
     figure.update_layout(barmode="overlay")
-    left.plotly_chart(ui.style_figure(figure, "Model jauh lebih selektif daripada rules", "per bulan 2021–2026; 2021–2024 = periode latih"),
+    left.plotly_chart(ui.style_figure(figure, "Model jauh lebih selektif daripada rules", "per bulan 2021–2026, seluruh wilayah; 2021–2024 = periode latih"),
                       use_container_width=True)
     unit_risk = services.table("unit_risk")
-    region = unit_risk[unit_risk["year"] == year].groupby("region").agg(transaksi=("transaksi", "sum"),
+    unit_risk = unit_risk[unit_risk["year"] == year]
+    group_by = "requester_unit" if regions else "region"
+    if regions:
+        unit_risk = unit_risk[unit_risk["region"].isin(regions)]
+    region = unit_risk.groupby(group_by).agg(transaksi=("transaksi", "sum"),
                                                                        alert=("alert_tinggi", "sum")).reset_index()
     region["alert_rate"] = region["alert"] / region["transaksi"]
-    figure = px.bar(region.sort_values("alert_rate"), x="alert_rate", y="region", orientation="h", color="alert_rate",
-                    color_continuous_scale=["#dbe9fb", ui.ORANGE], labels={"alert_rate": "% transaksi alert Tinggi", "region": ""})
+    figure = px.bar(region.sort_values("alert_rate").tail(15), x="alert_rate", y=group_by, orientation="h", color="alert_rate",
+                    color_continuous_scale=["#dbe9fb", ui.ORANGE], labels={"alert_rate": "% transaksi alert Tinggi", group_by: ""})
     figure.update_layout(coloraxis_showscale=False, xaxis_tickformat=".1%")
-    right.plotly_chart(ui.style_figure(figure, "Wilayah dengan tingkat alert tertinggi", f"{year}"), use_container_width=True)
+    right.plotly_chart(ui.style_figure(figure, "Unit dengan tingkat alert tertinggi" if regions else "Wilayah dengan tingkat alert tertinggi",
+                                       f"{year}" + (f" · {', '.join(regions)}" if regions else "")), use_container_width=True)
     left, middle, right = st.columns(3)
     communities = services.table("communities").head(5)
     with left:

@@ -26,7 +26,6 @@ pio.templates.default = "radar"
 
 CSS = f"""
 <style>
-.block-container {{padding-top: 1.6rem; padding-bottom: 2rem;}}
 .kpi-card {{background: white; border: 1px solid {GRID}; border-radius: 12px; padding: 14px 16px; height: 100%;
            box-shadow: 0 1px 2px rgba(0,0,0,.04);}}
 .kpi-label {{font-size: .78rem; color: {INK_SECONDARY}; text-transform: uppercase; letter-spacing: .03em;}}
@@ -104,6 +103,12 @@ def style_figure(fig, title: str = "", subtitle: str = "", height: int = 360):
     text = f"<b>{html.escape(title)}</b>" + (f"<br><span style='font-size:11px;color:{INK_SECONDARY}'>{html.escape(subtitle)}</span>" if subtitle else "")
     fig.update_layout(title=dict(text=text, x=0, xanchor="left", font=dict(size=14)), height=height)
     return fig
+
+
+def explain(items: dict, title: str = "Cara membaca angka & grafik di halaman ini") -> None:
+    """Penjelasan definisi metrik (explainability) dalam expander yang tertutup."""
+    with st.expander(title):
+        st.markdown("\n".join(f"- **{name}**: {text}" for name, text in items.items()))
 
 
 def empty_state(message: str) -> None:

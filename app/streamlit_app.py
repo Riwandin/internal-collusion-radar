@@ -70,7 +70,7 @@ def login_page() -> None:
             unsafe_allow_html=True)
 
         c1, c2 = st.columns(2)
-        c1.markdown(ui.kpi_card("Investigator", "Operasional", "antrean alert, uji model live, bukti, jaringan, profil, asisten investigasi",
+        c1.markdown(ui.kpi_card("Investigator", "Operasional", "overview alert, detail kasus & jaringan, profil pegawai, riwayat investigasi, asisten AI",
                                 ui.ORANGE), unsafe_allow_html=True)
         c2.markdown(ui.kpi_card("Manajemen", "Strategis", "KPI, risiko unit, jalankan model, stress test, kinerja & tata kelola model, dampak",
                                 ui.BLUE), unsafe_allow_html=True)
@@ -106,18 +106,14 @@ if "user" not in st.session_state:
 
 user = services.current_user()
 if user["role"] == "investigator":
+    detail_page = page(alerts.render, "Detail Kasus", ":material/plagiarism:", "detail-kasus")
+    services.PAGES["detail_kasus"] = detail_page
     pages = {
         "Investigasi": [
-            page(inv_overview.render, "Ringkasan", ":material/dashboard:", "ringkasan", True),
-            page(run_model.render, "Jalankan Model", ":material/play_circle:", "run-model"),
-            page(alerts.render, "Monitoring Alert", ":material/notifications_active:", "alert"),
-            page(network.render, "Jaringan Risiko", ":material/hub:", "jaringan"),
+            page(inv_overview.render, "Overview", ":material/dashboard:", "overview", True),
+            detail_page,
             page(employee_profile.render, "Profil Pegawai", ":material/badge:", "pegawai"),
-            page(my_reviews.render, "Riwayat Keputusan", ":material/fact_check:", "keputusan")
-        ],
-        "Analitik": [
-            page(score_analysis.render, "Analisis Skor", ":material/insights:", "skor"),
-            page(model_performance.render, "Performa Model", ":material/monitoring:", "performa")
+            page(my_reviews.render, "Riwayat Investigasi", ":material/fact_check:", "riwayat")
         ],
         "Asisten AI": [
             page(assistant.render, "Asisten AI (RAG + Agen)", ":material/smart_toy:", "asisten"),
