@@ -18,9 +18,7 @@ from radar_app.auth import ROLE_LABELS, demo_users, verify_login  # noqa: E402
 from radar_app.config import SETTINGS  # noqa: E402
 from radar_app.ui import components as ui  # noqa: E402
 from radar_app.ui import services  # noqa: E402
-from radar_app.views import (ai_governance, alerts, assistant, employee_profile, impact, inv_overview, knowledge_base,  # noqa: E402
-                             mgmt_overview, mlops, model_performance, my_reviews, network, run_model, score_analysis,
-                             stress_test, units)
+from radar_app.views import (assistant, impact, inv_overview, mgmt_overview, mlops, network, run_model)  # noqa: E402
 
 ui.inject_css()
 
@@ -70,10 +68,24 @@ def login_page() -> None:
             unsafe_allow_html=True)
 
         c1, c2 = st.columns(2)
-        c1.markdown(ui.kpi_card("Investigator", "Operasional", "overview alert, detail kasus & jaringan, profil pegawai, riwayat investigasi, asisten AI",
-                                ui.ORANGE), unsafe_allow_html=True)
-        c2.markdown(ui.kpi_card("Manajemen", "Strategis", "KPI, risiko unit, jalankan model, stress test, kinerja & tata kelola model, dampak",
-                                ui.BLUE), unsafe_allow_html=True)
+        c1.markdown(
+            ui.kpi_card(
+                "Investigator (4 Menu Fokus)",
+                "Operasional",
+                "Meja Investigasi 360° (Dossier + Unduh PDF + Tindak Lanjut), Peta Jaringan, Cek Berkas Baru, Copilot AI",
+                ui.ORANGE,
+            ),
+            unsafe_allow_html=True,
+        )
+        c2.markdown(
+            ui.kpi_card(
+                "Manajemen (4 Menu Fokus)",
+                "Strategis",
+                "Command Center & Peta Cabang, Simulasi Dampak & Kapasitas, Kesehatan Sistem & Tata Kelola, Copilot AI",
+                ui.BLUE,
+            ),
+            unsafe_allow_html=True,
+        )
 
 
 def sidebar_status(user: dict) -> None:
@@ -106,39 +118,21 @@ if "user" not in st.session_state:
 
 user = services.current_user()
 if user["role"] == "investigator":
-    detail_page = page(alerts.render, "Detail Kasus", ":material/plagiarism:", "detail-kasus")
-    services.PAGES["detail_kasus"] = detail_page
     pages = {
-        "Investigasi": [
-            page(inv_overview.render, "Overview", ":material/dashboard:", "overview", True),
-            detail_page,
-            page(employee_profile.render, "Profil Pegawai", ":material/badge:", "pegawai"),
-            page(my_reviews.render, "Riwayat Investigasi", ":material/fact_check:", "riwayat")
-        ],
-        "Asisten AI": [
-            page(assistant.render, "Asisten AI (RAG + Agen)", ":material/smart_toy:", "asisten"),
-            page(knowledge_base.render, "Knowledge Base", ":material/menu_book:", "knowledge-base")
+        "Menu Investigator": [
+            page(inv_overview.render, "Meja Investigasi 360°", ":material/person_search:", "meja-investigasi", True),
+            page(network.render, "Peta Jaringan & Komplotan", ":material/hub:", "jaringan"),
+            page(run_model.render, "Cek Berkas Baru (Live Test)", ":material/play_circle:", "live-test"),
+            page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),
         ],
     }
 else:
     pages = {
-        "Manajemen": [
-            page(mgmt_overview.render, "Ringkasan Eksekutif", ":material/space_dashboard:", "eksekutif", True),
-            page(units.render, "Risiko Unit & Wilayah", ":material/map:", "unit"),
-            page(network.render, "Jaringan Risiko", ":material/hub:", "jaringan"),
-            page(stress_test.render, "Stress Testing", ":material/tune:", "stress"),
-            page(impact.render, "Dampak Bisnis", ":material/payments:", "dampak")
-        ],
-        "Model & Tata Kelola": [
-            page(run_model.render, "Jalankan Model", ":material/play_circle:", "run-model"),
-            page(mlops.render, "Tata Kelola Model", ":material/model_training:", "tata-kelola-model"),
-            page(model_performance.render, "Performa Model", ":material/monitoring:", "performa"),
-            page(score_analysis.render, "Analisis Skor", ":material/insights:", "skor"),
-            page(ai_governance.render, "Audit & Kualitas AI", ":material/verified_user:", "audit-ai")
-        ],
-        "Asisten AI": [
-            page(assistant.render, "Asisten AI (RAG + Agen)", ":material/smart_toy:", "asisten"),
-            page(knowledge_base.render, "Knowledge Base", ":material/menu_book:", "knowledge-base")
+        "Menu Manajemen": [
+            page(mgmt_overview.render, "Command Center & Peta Cabang", ":material/space_dashboard:", "command-center", True),
+            page(impact.render, "Simulasi Dampak Bisnis & Kebijakan", ":material/payments:", "dampak-kebijakan"),
+            page(mlops.render, "Kesehatan Sistem & Tata Kelola", ":material/verified_user:", "tata-kelola"),
+            page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),
         ],
     }
 

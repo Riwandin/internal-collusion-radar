@@ -1,7 +1,8 @@
-"""Asisten AI: RAG (tanya regulasi & panduan) dan Agen (tools sesuai role) dengan guardrail, sumber, dan LLM-as-judge."""
+"""Copilot AI & Regulasi KUR: Asisten AI (RAG + Agen) dan Pustaka Dokumen Regulasi & SOP (Knowledge Base)."""
 from __future__ import annotations
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 from ..config import SETTINGS
@@ -9,17 +10,34 @@ from ..genai.tools import ROLE_TOOLS, TOOL_SPECS
 from ..ui import components as ui
 from ..ui import services
 from .common import show_guard_checks
+from .knowledge_base import render_add_document, render_documents, render_search_test
 
 EXAMPLES = {
-    "investigator": {"rag": ["Apa saja empat pilar strategi anti fraud menurut POJK 12/2024?",
-                             "Kenapa approval malam belum tentu kolusi?", "Berapa target waktu triase alert kategori Tinggi?"],
-                     "agent": ["Tampilkan 5 alert dengan skor tertinggi di unit Bekasi",
-                               "Siapa saja anggota komunitas risiko dengan skor tertinggi?",
-                               "Siapkan draf memo investigasi untuk transaksi {top}"]},
-    "manajemen": {"rag": ["Apa kewajiban pelaporan fraud ke OJK?", "Bagaimana rumus manfaat bersih sistem?",
-                          "Kapan model harus dilatih ulang?"],
-                  "agent": ["Ringkas kondisi risiko kolusi tahun 2026", "Unit mana yang paling berisiko?",
-                            "Kalau investigator hanya 4 orang, berapa alert per bulan yang bisa ditangani?"]}}
+    "investigator": {
+        "rag": [
+            "Apa saja empat pilar strategi anti fraud menurut POJK 12/2024?",
+            "Kenapa approval malam belum tentu kolusi?",
+            "Berapa target waktu triase alert kategori Tinggi?",
+        ],
+        "agent": [
+            "Tampilkan 5 alert dengan skor tertinggi di unit Bekasi",
+            "Siapa saja anggota komunitas risiko dengan skor tertinggi?",
+            "Siapkan draf memo investigasi untuk transaksi {top}",
+        ],
+    },
+    "manajemen": {
+        "rag": [
+            "Apa kewajiban pelaporan fraud ke OJK?",
+            "Bagaimana rumus manfaat bersih sistem?",
+            "Kapan model harus dilatih ulang?",
+        ],
+        "agent": [
+            "Ringkas kondisi risiko kolusi tahun 2026",
+            "Unit mana yang paling berisiko?",
+            "Kalau investigator hanya 4 orang, berapa alert per bulan yang bisa ditangani?",
+        ],
+    },
+}
 
 
 def render_message(message: dict, index: int) -> None:
@@ -28,16 +46,24 @@ def render_message(message: dict, index: int) -> None:
         result = message.get("result")
         if not result:
             return
-        mode_label = {"llm": "LLM (Gemma)", "fallback": "cadangan tanpa LLM", "fallback_grounding": "kutipan sumber (grounding)",
-                      "abstain": "tidak tahu (konteks lemah)", "blocked": "DIBLOKIR guardrail", "rule_based": "planner aturan (tanpa LLM)"}
+        mode_label = {
+            "llm": "LLM (Gemma)",
+            "fallback": "cadangan tanpa LLM",
+            "fallback_grounding": "kutipan sumber (grounding)",
+            "abstain": "tidak tahu (konteks lemah)",
+            "blocked": "DIBLOKIR guardrail",
+            "rule_based": "planner aturan (tanpa LLM)",
+        }
         st.caption(f"mode: {mode_label.get(result['mode'], result['mode'])} · {result.get('latency_ms', 0):.0f} ms")
         if result.get("contexts"):
             with st.expander(f"Sumber ({len(result['contexts'])})"):
                 for number, context in enumerate(result["contexts"], start=1):
-                    st.markdown(f"**[S{number}] {context['title']}** › {context['section']}  \n"
-                                f"<span class='small-note'>{context.get('url', '')} · RRF {context['rrf_score']:.3f} · "
-                                f"dense #{context.get('dense_rank') or '-'} · BM25 #{context.get('sparse_rank') or '-'}</span>",
-                                unsafe_allow_html=True)
+                    st.markdown(
+                        f"**[S{number}] {context['title']}** › {context['section']}  \n"
+                        f"<span class='small-note'>{context.get('url', '')} · RRF {context['rrf_score']:.3f} · "
+                        f"dense #{context.get('dense_rank') or '-'} · BM25 #{context.get('sparse_rank') or '-'}</span>",
+                        unsafe_allow_html=True,
+                    )
                     st.markdown(f"> {context['text'].split(chr(10), 1)[-1][:500]}…")
         if result.get("steps"):
             with st.expander(f"Langkah agen ({len(result['steps'])})"):
@@ -48,8 +74,10 @@ def render_message(message: dict, index: int) -> None:
             show_guard_checks(result.get("checks", []))
         if message.get("judge"):
             scores = message["judge"]
-            st.markdown("**Penilaian LLM-as-judge:** " + " · ".join(
-                f"{criterion} {value['score']:.1f}" for criterion, value in scores.items() if pd.notna(value["score"])))
+            st.markdown(
+                "**Penilaian LLM-as-judge:** "
+                + " · ".join(f"{criterion} {value['score']:.1f}" for criterion, value in scores.items() if pd.notna(value["score"]))
+            )
         elif result.get("contexts") and result["mode"] not in ("blocked",):
             if st.button("Nilai jawaban ini (LLM-as-judge)", key=f"judge_{index}"):
                 judge = services.get_judge()
@@ -58,36 +86,28 @@ def render_message(message: dict, index: int) -> None:
                 message["judge"] = verdict
                 user = services.current_user()
                 for criterion, value in verdict.items():
-                    services.get_store().save_judge_result(user["username"], result["question"], criterion,
-                                                           value["score"], value["rationale"], judge.engine, result["mode"])
+                    services.get_store().save_judge_result(
+                        user["username"], result["question"], criterion, value["score"], value["rationale"], judge.engine, result["mode"]
+                    )
                 st.rerun()
 
 
-def render() -> None:
-    user = services.current_user()
-    role = user["role"]
-    ui.page_header("Asisten AI", "Tanya regulasi & panduan (RAG) atau minta agen mengerjakan tugas dengan tools sesuai wewenang Anda")
-    llm = services.get_llm()
-    retriever = services.get_retriever()
-    status = {"Generator": (SETTINGS.generator_model, llm.has_model(SETTINGS.generator_model)),
-              "Guardrail model": (SETTINGS.guard_model, llm.has_model(SETTINGS.guard_model)),
-              "Juri": (SETTINGS.judge_model, llm.has_model(SETTINGS.judge_model))}
-    columns = st.columns(4)
-    for column, (label, (model, ok)) in zip(columns, status.items()):
-        column.markdown(ui.kpi_card(label, "aktif" if ok else "cadangan", model, ui.GREEN if ok else ui.YELLOW), unsafe_allow_html=True)
-    columns[3].markdown(ui.kpi_card("Knowledge base", f"{len(retriever.chunks)} chunk", retriever.embedder.name[:40], ui.BLUE),
-                        unsafe_allow_html=True)
-    mode = st.radio("Mode", ["Tanya regulasi & panduan (RAG)", "Agen investigasi (tools)"], horizontal=True, key="assistant_mode")
+def _render_chat_copilot(user: dict, role: str, retriever) -> None:
+    mode = st.radio("Mode Asisten", ["Tanya regulasi & panduan (RAG)", "Agen investigasi (tools)"], horizontal=True, key="assistant_mode")
     is_agent = mode.startswith("Agen")
     with st.expander("Tools yang boleh dipakai agen untuk role Anda" if is_agent else "Cara kerja RAG"):
         if is_agent:
-            st.dataframe(pd.DataFrame([{"tool": t, "fungsi": TOOL_SPECS[t]["description"]} for t in ROLE_TOOLS[role]]),
-                         hide_index=True, use_container_width=True)
+            st.dataframe(
+                pd.DataFrame([{"tool": t, "fungsi": TOOL_SPECS[t]["description"]} for t in ROLE_TOOLS[role]]),
+                hide_index=True, use_container_width=True,
+            )
             st.caption("Agen hanya membaca data. Draf memo selalu menunggu persetujuan manusia. Maksimal 4 langkah per permintaan.")
         else:
-            st.markdown(f"Hybrid retrieval (dense MiniLM + FAISS dan BM25, digabung RRF, top 4; dense_k={SETTINGS.dense_k}, "
-                        f"sparse_k={SETTINGS.sparse_k}) → {SETTINGS.generator_model} (temperature {SETTINGS.generator_temperature}) "
-                        "menjawab hanya dari konteks dengan sitasi [S#] → guardrail output.")
+            st.markdown(
+                f"Hybrid retrieval (dense MiniLM + FAISS dan BM25, digabung RRF, top 4; dense_k={SETTINGS.dense_k}, "
+                f"sparse_k={SETTINGS.sparse_k}) → {SETTINGS.generator_model} (temperature {SETTINGS.generator_temperature}) "
+                "menjawab hanya dari konteks dengan sitasi [S#] → guardrail output."
+            )
     history_key = f"chat_{role}_{'agent' if is_agent else 'rag'}"
     st.session_state.setdefault(history_key, [])
     top = services.table("transactions_scored").sort_values("risk_score", ascending=False)["request_id"].iloc[0]
@@ -129,3 +149,58 @@ def render() -> None:
     if st.session_state[history_key] and st.button("Bersihkan percakapan"):
         st.session_state[history_key] = []
         st.rerun()
+
+
+def _render_knowledge_base_tab(user: dict, retriever) -> None:
+    chunks = pd.DataFrame(retriever.chunks)
+    tab_docs, tab_search, tab_add = st.tabs([
+        "📖 Daftar Dokumen & Chunk",
+        "🔎 Uji Pencarian (Dense vs BM25 vs Hybrid)",
+        "➕ Tambah Dokumen Baru",
+    ])
+    with tab_docs:
+        left, right = st.columns([2, 1])
+        with right:
+            figure = px.histogram(chunks, x="n_tokens", nbins=15, color_discrete_sequence=[ui.BLUE])
+            figure.add_vline(x=SETTINGS.chunk_max_tokens, line_dash="dash", line_color=ui.RED, annotation_text="batas 600")
+            st.plotly_chart(ui.style_figure(figure, "Panjang chunk (token)", "semua di bawah batas", 280), use_container_width=True)
+            per_category = chunks.groupby("category")["doc_id"].nunique().reset_index(name="dokumen")
+            st.plotly_chart(ui.style_figure(px.bar(per_category, x="dokumen", y="category", orientation="h"), "Dokumen per kategori", "", 240), use_container_width=True)
+        with left:
+            render_documents(chunks)
+    with tab_search:
+        render_search_test(retriever)
+    with tab_add:
+        render_add_document(user)
+
+
+def render() -> None:
+    user = services.current_user()
+    role = user["role"]
+    ui.page_header(
+        "Copilot AI & Regulasi KUR",
+        "Tanya regulasi & SOP (RAG), minta agen mengerjakan tugas sesuai wewenang Anda, atau telusuri pustaka dokumen acuan",
+    )
+    llm = services.get_llm()
+    retriever = services.get_retriever()
+    status = {
+        "Generator": (SETTINGS.generator_model, llm.has_model(SETTINGS.generator_model)),
+        "Guardrail model": (SETTINGS.guard_model, llm.has_model(SETTINGS.guard_model)),
+        "Juri": (SETTINGS.judge_model, llm.has_model(SETTINGS.judge_model)),
+    }
+    columns = st.columns(4)
+    for column, (label, (model, ok)) in zip(columns, status.items()):
+        column.markdown(ui.kpi_card(label, "aktif" if ok else "cadangan", model, ui.GREEN if ok else ui.YELLOW), unsafe_allow_html=True)
+    columns[3].markdown(
+        ui.kpi_card("Knowledge base", f"{len(retriever.chunks)} chunk", retriever.embedder.name[:40], ui.BLUE),
+        unsafe_allow_html=True,
+    )
+
+    tab_copilot, tab_kb = st.tabs([
+        "🤖 Tanya Asisten AI (RAG & Agen Investigasi)",
+        "📚 Pustaka Dokumen Regulasi & SOP (Knowledge Base)",
+    ])
+    with tab_copilot:
+        _render_chat_copilot(user, role, retriever)
+    with tab_kb:
+        _render_knowledge_base_tab(user, retriever)

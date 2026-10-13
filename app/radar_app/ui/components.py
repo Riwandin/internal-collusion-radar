@@ -26,6 +26,7 @@ pio.templates.default = "radar"
 
 CSS = f"""
 <style>
+.block-container {{padding-top: 1.4rem; padding-bottom: 2.2rem;}}
 .kpi-card {{background: white; border: 1px solid {GRID}; border-radius: 12px; padding: 14px 16px; height: 100%;
            box-shadow: 0 1px 2px rgba(0,0,0,.04);}}
 .kpi-label {{font-size: .78rem; color: {INK_SECONDARY}; text-transform: uppercase; letter-spacing: .03em;}}
@@ -40,6 +41,26 @@ CSS = f"""
 .evidence li {{margin-bottom: 4px;}}
 .guard-ok {{color: {GREEN}; font-weight: 600;}} .guard-fail {{color: {RED}; font-weight: 600;}}
 .small-note {{font-size: .8rem; color: {MUTED};}}
+.dossier-banner {{
+    background: linear-gradient(135deg, #f8fafd 0%, #fff7f3 100%);
+    border: 1px solid {GRID};
+    border-left: 5px solid {ORANGE};
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 10px 0 16px 0;
+}}
+.dossier-title {{font-size: 1.15rem; font-weight: 700; color: {INK}; margin-bottom: 6px;}}
+.dossier-summary {{font-size: .95rem; color: {INK}; line-height: 1.55;}}
+.reason-card {{
+    background: white;
+    border: 1px solid {GRID};
+    border-left: 4px solid var(--accent, {ORANGE});
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}}
+.reason-title {{font-weight: 700; font-size: .9rem; color: {INK};}}
+.reason-detail {{font-size: .84rem; color: {INK_SECONDARY}; margin-top: 2px;}}
 </style>
 """
 
