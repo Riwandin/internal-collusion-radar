@@ -10,6 +10,7 @@ import streamlit as st
 
 BLUE, ORANGE, GREEN, YELLOW, PURPLE, RED = "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#7b5cd6", "#c2362b"
 INK, INK_SECONDARY, MUTED, GRID, SURFACE = "#1f2328", "#52514e", "#8a8984", "#e6e5e1", "#f6f7f9"
+BNI_TEAL, BNI_ORANGE, BNI_PEACH, BNI_MINT = "#006d6f", "#f15a23", "#fde7da", "#dff3f1"
 BAND_COLORS = {"Tinggi": ORANGE, "Sedang": YELLOW, "Rendah": "#9ec5f0"}
 ANOMALY_COLORS = {"Perlu dilihat": ORANGE, "Pantau": YELLOW, "Normal": "#9ec5f0"}
 GROUP_COLORS = {"Transaksi": BLUE, "Riwayat debitur": PURPLE, "Relasi pasangan": YELLOW, "Graph": ORANGE, "Rules": MUTED,
@@ -73,6 +74,16 @@ CSS = f"""
 }}
 .reason-title {{font-weight: 700; font-size: .9rem; color: {INK};}}
 .reason-detail {{font-size: .84rem; color: {INK_SECONDARY}; margin-top: 2px;}}
+.exec-card {{background: white; border: 1px solid {GRID}; border-radius: 12px; padding: 14px 16px; height: 100%;
+    min-height: 132px; box-shadow: 0 1px 3px rgba(15, 23, 42, .05);}}
+.card-title-box {{display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1rem; color: {INK};
+    margin: 4px 0 8px 0;}}
+.card-header-badge {{display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+    border-radius: 50%; background: {BNI_TEAL}; color: white; font-size: .8rem; font-weight: 700; margin-right: 8px;}}
+.driver-card {{display: flex; align-items: center; justify-content: space-between; background: white;
+    border: 1px solid {GRID}; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;}}
+.exec-stat-box {{display: flex; align-items: center; gap: 14px; background: white; border: 1px solid {GRID};
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;}}
 </style>
 """
 

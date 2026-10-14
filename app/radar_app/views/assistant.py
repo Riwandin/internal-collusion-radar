@@ -95,19 +95,13 @@ def render_message(message: dict, index: int) -> None:
 def _render_chat_copilot(user: dict, role: str, retriever) -> None:
     mode = st.radio("Mode Asisten", ["Tanya regulasi & panduan (RAG)", "Agen investigasi (tools)"], horizontal=True, key="assistant_mode")
     is_agent = mode.startswith("Agen")
-    with st.expander("Tools yang boleh dipakai agen untuk role Anda" if is_agent else "Cara kerja RAG"):
-        if is_agent:
+    if is_agent:
+        with st.expander("Tools yang boleh dipakai agen untuk role Anda"):
             st.dataframe(
                 pd.DataFrame([{"tool": t, "fungsi": TOOL_SPECS[t]["description"]} for t in ROLE_TOOLS[role]]),
                 hide_index=True, use_container_width=True,
             )
             st.caption("Agen hanya membaca data. Draf memo selalu menunggu persetujuan manusia. Maksimal 4 langkah per permintaan.")
-        else:
-            st.markdown(
-                f"Hybrid retrieval (dense MiniLM + FAISS dan BM25, digabung RRF, top 4; dense_k={SETTINGS.dense_k}, "
-                f"sparse_k={SETTINGS.sparse_k}) → {SETTINGS.generator_model} (temperature {SETTINGS.generator_temperature}) "
-                "menjawab hanya dari konteks dengan sitasi [S#] → guardrail output."
-            )
     history_key = f"chat_{role}_{'agent' if is_agent else 'rag'}"
     st.session_state.setdefault(history_key, [])
     top = services.table("transactions_scored").sort_values("risk_score", ascending=False)["request_id"].iloc[0]
@@ -181,20 +175,7 @@ def render() -> None:
         "Copilot AI & Regulasi KUR",
         "Tanya regulasi & SOP (RAG), minta agen mengerjakan tugas sesuai wewenang Anda, atau telusuri pustaka dokumen acuan",
     )
-    llm = services.get_llm()
     retriever = services.get_retriever()
-    status = {
-        "Generator": (SETTINGS.generator_model, llm.has_model(SETTINGS.generator_model)),
-        "Guardrail model": (SETTINGS.guard_model, llm.has_model(SETTINGS.guard_model)),
-        "Juri": (SETTINGS.judge_model, llm.has_model(SETTINGS.judge_model)),
-    }
-    columns = st.columns(4)
-    for column, (label, (model, ok)) in zip(columns, status.items()):
-        column.markdown(ui.kpi_card(label, "aktif" if ok else "cadangan", model, ui.GREEN if ok else ui.YELLOW), unsafe_allow_html=True)
-    columns[3].markdown(
-        ui.kpi_card("Knowledge base", f"{len(retriever.chunks)} chunk", retriever.embedder.name[:40], ui.BLUE),
-        unsafe_allow_html=True,
-    )
 
     tab_copilot, tab_kb = st.tabs([
         "🤖 Tanya Asisten AI (RAG & Agen Investigasi)",
