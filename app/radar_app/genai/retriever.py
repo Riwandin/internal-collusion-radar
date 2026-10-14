@@ -111,7 +111,7 @@ class HybridRetriever:
         np.save(folder / "window_vectors.npy", self.window_vectors)
         (folder / "windows.json").write_text(json.dumps({"texts": self.window_texts,
                                                           "chunk_index": self.window_chunk_index.tolist(),
-                                                          "embedder": self.embedder.name}, ensure_ascii=False))
+                                                          "embedder": self.embedder.name}, ensure_ascii=False), encoding="utf-8")
         if isinstance(self.embedder, LsaEmbedder):
             import joblib
             joblib.dump(self.embedder, folder / "lsa_embedder.joblib")
@@ -119,7 +119,7 @@ class HybridRetriever:
     @classmethod
     def load(cls, folder: Path, model_name: str) -> "HybridRetriever":
         folder = Path(folder)
-        meta = json.loads((folder / "windows.json").read_text())
+        meta = json.loads((folder / "windows.json").read_text(encoding="utf-8"))
         real_embedder_available = importlib.util.find_spec("sentence_transformers") is not None
         if "LSA" in meta["embedder"] and real_embedder_available:      # indeks lama dibuat dengan pengganti → bangun ulang
             return cls.build(load_chunks(folder / "chunks.jsonl"), model_name)

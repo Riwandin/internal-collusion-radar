@@ -20,7 +20,7 @@ def _retrieval_defaults() -> dict:
     """k dense & sparse hasil tuning di notebook (Bagian 8.4); kalau belum ada, pakai default."""
     path = PROJECT_ROOT / "outputs" / "rag_index" / "retrieval_config.json"
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {"dense_k": 8, "sparse_k": 8}
 

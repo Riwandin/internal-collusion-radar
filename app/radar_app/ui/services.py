@@ -95,6 +95,14 @@ def name_map() -> dict:
     return table("employees").set_index("employee_id")["employee_name"].to_dict()
 
 
+def unit_region() -> dict:
+    """Nama unit -> wilayah (dari tabel pegawai)."""
+    employees = table("employees")
+    if "region" not in employees:
+        return {}
+    return employees.dropna(subset=["unit_name"]).drop_duplicates("unit_name").set_index("unit_name")["region"].to_dict()
+
+
 def current_user() -> dict:
     return st.session_state.get("user", {"username": "-", "display_name": "-", "role": "investigator"})
 

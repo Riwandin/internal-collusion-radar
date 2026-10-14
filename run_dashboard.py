@@ -14,12 +14,15 @@ def main():
     root = Path(__file__).resolve().parent
     app_path = root / "app" / "streamlit_app.py"
 
-    # Prioritas binary streamlit
-    venv_streamlit = root / ".venv" / "bin" / "streamlit"
+    # Prioritas binary streamlit (.venv lokal Windows/Unix -> parent .venv -> conda bootcamp -> PATH)
+    venv_win_streamlit = root / ".venv" / "Scripts" / "streamlit.exe"
+    venv_unix_streamlit = root / ".venv" / "bin" / "streamlit"
     root_venv_streamlit = root.parent / ".venv" / "bin" / "streamlit"
     bootcamp_streamlit = Path("/Users/wandi/miniforge3/envs/bootcamp/bin/streamlit")
-    if venv_streamlit.exists() and os.access(venv_streamlit, os.X_OK):
-        streamlit_exec = str(venv_streamlit)
+    if venv_win_streamlit.exists():
+        streamlit_exec = str(venv_win_streamlit)
+    elif venv_unix_streamlit.exists() and os.access(venv_unix_streamlit, os.X_OK):
+        streamlit_exec = str(venv_unix_streamlit)
     elif root_venv_streamlit.exists() and os.access(root_venv_streamlit, os.X_OK):
         streamlit_exec = str(root_venv_streamlit)
     elif bootcamp_streamlit.exists() and os.access(bootcamp_streamlit, os.X_OK):

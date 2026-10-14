@@ -24,13 +24,13 @@ def _render_financial_impact(settings: dict) -> None:
     fraud_per_year = settings.get("fraud_cases_per_year", 0)
     scenarios = {
         "Rules saja": (settings.get("rules_test_recall", 0), settings.get("rules_alerts_per_month", 0)),
-        "Model final": (settings.get("test_recall", 0), settings.get("model_alerts_per_month", 0)),
+        "Risk Engine": (settings.get("test_recall", 0), settings.get("model_alerts_per_month", 0)),
     }
     rows = []
     for name, (recall, alerts) in scenarios.items():
         prevented = fraud_per_year * recall * prevention * base_loss * lgd
         review = alerts * 12 * hours * cost
-        extra = system_cost if name == "Model final" else 0
+        extra = system_cost if name == "Risk Engine" else 0
         rows.append({
             "skenario": name,
             "recall": recall,
@@ -42,7 +42,7 @@ def _render_financial_impact(settings: dict) -> None:
             "FTE investigator": alerts * hours / 120,
         })
     table = pd.DataFrame(rows).set_index("skenario")
-    model, rules = table.loc["Model final"], table.loc["Rules saja"]
+    model, rules = table.loc["Risk Engine"], table.loc["Rules saja"]
     roi = model["manfaat bersih"] / max(model["biaya pemeriksaan"] + model["biaya sistem"], 1)
 
     ui.kpi_row([
@@ -63,7 +63,7 @@ def _render_financial_impact(settings: dict) -> None:
     ]:
         figure.add_bar(x=table.index, y=table[column] / 1e9, name=column, marker_color=color)
     figure.update_layout(barmode="group", yaxis_title="Rp miliar / tahun")
-    left.plotly_chart(ui.style_figure(figure, "Perbandingan finansial: Model vs Rules saja", "berdasarkan parameter di atas"), use_container_width=True)
+    left.plotly_chart(ui.style_figure(figure, "Perbandingan finansial: Risk Engine vs Rules saja", "berdasarkan parameter di atas"), use_container_width=True)
 
     grid = pd.DataFrame(
         [[fraud_per_year * model["recall"] * p * base_loss * l - model["biaya pemeriksaan"] - model["biaya sistem"]
@@ -97,7 +97,7 @@ def _render_financial_impact(settings: dict) -> None:
 | Pilar POJK 12/2024 | Peran sistem |
 |---|---|
 | Pencegahan | efek jera, profil approver berisiko |
-| Deteksi | rules + graph + IF + classifier |
+| Deteksi | Risk Engine 4 pilar: rules + IF + konten + relasi/graph |
 | Investigasi & pelaporan | meja investigasi 360°, PDF dossier, draf memo (disetujui manusia) |
 | Pemantauan & evaluasi | command center, stress test, drift PSI, LLM-as-judge |""")
     st.caption("Estimasi memakai data sintetis dan asumsi yang dinyatakan terbuka; validasi dengan data internal sebelum dipakai untuk keputusan anggaran.")
@@ -113,7 +113,7 @@ def _render_stress_testing(settings: dict) -> None:
     tab_capacity, tab_evasion, tab_outage, tab_prevalence, tab_drift = st.tabs([
         "A. Kapasitas Tim & Threshold",
         "B. Pelaku Beradaptasi (Evasion)",
-        "C. Pipeline Graph Gagal",
+        "C/F. Sumber Data Gagal",
         "D. Prevalensi Berubah",
         "E. Drift Data (PSI)",
     ])
@@ -172,7 +172,7 @@ def _render_stress_testing(settings: dict) -> None:
             new_probability = model.predict_proba(adapted)
             positives = adapted["fraud_label"] == 1
             result = pd.DataFrame({
-                "pendekatan": ["Rules", "Model (rules + graph + riwayat)"],
+                "pendekatan": ["Rules", "Risk Engine 4 pilar"],
                 "recall sebelum": [
                     (test.loc[positives, "rule_score"] >= rules_threshold).mean(),
                     (test.loc[positives, "risk_probability"] >= threshold).mean(),
@@ -186,18 +186,40 @@ def _render_stress_testing(settings: dict) -> None:
             figure.add_bar(x=result["pendekatan"], y=result["recall sebelum"] * 100, name="sebelum", marker_color=ui.MUTED)
             figure.add_bar(x=result["pendekatan"], y=result["recall sesudah"] * 100, name="sesudah pelaku beradaptasi", marker_color=ui.ORANGE)
             figure.update_layout(barmode="group", yaxis_title="recall (%)", yaxis_range=[0, 105])
-            st.plotly_chart(ui.style_figure(figure, "Rules runtuh, model bertahan karena pola hubungan sulit disembunyikan"), use_container_width=True)
+            st.plotly_chart(ui.style_figure(figure, "Rules runtuh, Risk Engine bertahan karena Pilar 4 (relasi) sulit disembunyikan"),
+                            use_container_width=True)
+            if hasattr(model, "pillar_scores"):
+                before = model.score_frame(test[positives])
+                after = model.score_frame(adapted[positives])
+                shift = pd.DataFrame({"pilar": [ui.PILLAR_SHORT[p] for p in ui.PILLARS],
+                                      "sebelum": [before[f"c_{p}"].mean() for p in ui.PILLARS],
+                                      "sesudah": [after[f"c_{p}"].mean() for p in ui.PILLARS]}).melt(id_vars="pilar")
+                figure = px.bar(shift, x="value", y="pilar", color="variable", barmode="group", orientation="h",
+                                color_discrete_map={"sebelum": ui.MUTED, "sesudah": ui.ORANGE},
+                                labels={"value": "rata-rata kontribusi (log-odds)", "variable": ""})
+                st.plotly_chart(ui.style_figure(figure, "Pilar mana yang melemah saat pelaku beradaptasi?",
+                                                "rata-rata kontribusi tiap pilar pada kasus kolusi test 2026", height=300),
+                                use_container_width=True)
             st.caption("Dalam jangka panjang fitur graph juga ikut melemah karena dibangun dari red flag; karena itu model dilatih ulang berkala.")
 
     with tab_outage:
         st.dataframe(services.table("stress_graph_outage"), hide_index=True, use_container_width=True)
-        if model is not None and st.button("Hitung ulang langsung: kosongkan semua fitur graph"):
-            outage = test.copy()
-            outage[GRAPH_FEATURES] = np.nan
-            probability = model.predict_proba(outage)
-            recall, precision = recall_precision(test["fraud_label"].to_numpy(), probability, settings.get("final_threshold", 0.5))
-            st.metric("Recall tanpa fitur graph", ui.percent(recall), f"{(recall - settings.get('test_recall', recall)) * 100:+.0f} poin")
-        st.caption("Sistem tetap berjalan (imputasi), tetapi kinerja turun: kegagalan pipeline graph harus memicu alarm monitoring.")
+        if model is not None:
+            outage_choice = st.radio("Simulasikan kegagalan", ["C. fitur graph g_* hilang", "F. skor IF (Pilar 2) hilang"],
+                                     horizontal=True, key="impact_outage_choice")
+            if st.button("Hitung ulang langsung dengan Risk Engine", key="impact_outage_run"):
+                outage = test.copy()
+                if outage_choice.startswith("C"):
+                    outage[GRAPH_FEATURES] = np.nan
+                else:
+                    outage["approver_anomaly_score"] = np.nan
+                probability = model.predict_proba(outage)
+                recall, precision = recall_precision(test["fraud_label"].to_numpy(), probability, settings.get("final_threshold", 0.5))
+                left, right = st.columns(2)
+                left.metric("Recall", ui.percent(recall), f"{(recall - settings.get('test_recall', recall)) * 100:+.0f} poin")
+                right.metric("Precision", ui.percent(precision))
+        st.caption("Sistem tetap berjalan (Pilar 4 masih punya fitur relasi pasangan; IF kosong diganti nilai netral + indikator), "
+                   "tetapi kinerja turun: kegagalan pipeline harus memicu alarm monitoring.")
 
     with tab_prevalence:
         multiplier = st.slider("Proporsi kolusi dibanding data uji (×)", 0.1, 3.0, 1.0, step=0.1)
@@ -222,8 +244,9 @@ def _render_stress_testing(settings: dict) -> None:
         figure.add_vline(x=0.1, line_dash="dot", line_color=ui.YELLOW)
         figure.add_vline(x=0.25, line_dash="dash", line_color=ui.ORANGE)
         st.plotly_chart(
-            ui.style_figure(figure, "Population Stability Index fitur utama (2026 vs data latih)",
-                            "< 0,1 stabil · 0,1–0,25 pantau · > 0,25 bergeser → evaluasi & latih ulang"),
+            ui.style_figure(figure, "Population Stability Index: fitur utama & skor pilar",
+                            "fitur: 2026 vs data latih · skor pilar: 2026 vs validation 2025 · < 0,1 stabil · > 0,25 latih ulang",
+                            height=460),
             use_container_width=True,
         )
 

@@ -1,0 +1,5 @@
+pilar,label,koefisien,pengaruh,bobot_efektif,bobot_manual_v9x
+rule,Pilar 1 · Rules SOP,0.0,0.0,0.0,0.15
+iforest,Pilar 2 · Anomali approver (IF),1.8090613657697088,0.5941521363951338,0.14739460213956623,0.2
+classifier,Pilar 3 · Konten transaksi,0.9475004670692806,1.9844397702532395,0.4922909344078966,0.4
+graph,Pilar 4 · Relasi & jaringan,0.7929983613763752,1.4524385908764823,0.3603144634525372,0.25

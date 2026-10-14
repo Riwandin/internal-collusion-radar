@@ -14,7 +14,7 @@ import pandas as pd
 
 from .config import SETTINGS, Settings
 
-DATE_COLUMNS = {"transactions_scored": ["event_time", "request_ts", "approve_ts"], "test_features": ["case_ts"],
+DATE_COLUMNS = {"transactions_scored": ["event_time", "request_ts", "approve_ts"], "test_features": ["case_ts", "event_time"],
                 "employees": ["employment_start_date"]}
 APP_TABLES = {
     "case_reviews": ["reviewed_at", "username", "role", "request_id", "decision", "note", "risk_score", "model_name"],
@@ -109,7 +109,7 @@ class DataStore:
             except Exception:
                 pass
         path = self.settings.app_data_dir / f"{name}.json"
-        return json.loads(path.read_text()) if path.exists() else {}
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
     # ------------------------------------------------------------------ catatan aplikasi
     def _append(self, table: str, record: dict) -> None:

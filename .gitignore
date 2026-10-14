@@ -34,6 +34,12 @@ ehthumbs.db
 outputs/app_state/*
 !outputs/app_state/.gitkeep
 
+# MLflow lokal (dibuat saat notebook dijalankan tanpa server MLflow)
+outputs/mlflow.db
+mlruns/
+mlartifacts/
+logs.log
+
 # Raw data directory (generated via data_generator)
 data/*
 !data/.gitkeep

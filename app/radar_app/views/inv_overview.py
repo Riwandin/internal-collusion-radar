@@ -448,35 +448,38 @@ def render() -> None:
         selected_req_id = None
 
         with tab_p_emp:
-            emp_selection = st.dataframe(
-                filtered_emp[[
-                    "employee_id", "employee_name", "role", "position", "unit_name",
-                    "skor_anomali", "alert_tinggi", "belum_diputus", "nominal_berisiko_fmt",
-                    "komunitas", "status_penanganan",
-                ]],
-                hide_index=True,
-                use_container_width=True,
-                height=320,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="ws_emp_table_v2",
-                column_config={
-                    "employee_id": st.column_config.TextColumn("ID", width="small"),
-                    "employee_name": st.column_config.TextColumn("Nama Pegawai", width="medium"),
-                    "role": st.column_config.TextColumn("Peran", width="small"),
-                    "position": st.column_config.TextColumn("Jabatan", width="medium"),
-                    "unit_name": st.column_config.TextColumn("Cabang/Unit", width="small"),
-                    "skor_anomali": st.column_config.ProgressColumn("Skor Perilaku (IF)", min_value=0, max_value=100, format="%.0f"),
-                    "alert_tinggi": st.column_config.NumberColumn("Tot Alert", format="%d"),
-                    "belum_diputus": st.column_config.NumberColumn("Belum Diputus", format="%d"),
-                    "nominal_berisiko_fmt": "Eksposur Berisiko",
-                    "komunitas": st.column_config.NumberColumn("Komunitas", format="#%d"),
-                    "status_penanganan": "Status",
-                },
-            )
-            sel_rows = getattr(getattr(emp_selection, "selection", None), "rows", []) or []
-            selected_emp_id = str(filtered_emp.iloc[sel_rows[0]]["employee_id"]) if sel_rows else str(filtered_emp.iloc[0]["employee_id"])
-            st.caption(f"Menampilkan {len(filtered_emp)} pegawai prioritas · Klik baris untuk mengganti sorotan.")
+            if filtered_emp.empty:
+                st.info("Tidak ada data pegawai mencurigakan yang sesuai filter.")
+            else:
+                emp_selection = st.dataframe(
+                    filtered_emp[[
+                        "employee_id", "employee_name", "role", "position", "unit_name",
+                        "skor_anomali", "alert_tinggi", "belum_diputus", "nominal_berisiko_fmt",
+                        "komunitas", "status_penanganan",
+                    ]],
+                    hide_index=True,
+                    use_container_width=True,
+                    height=320,
+                    on_select="rerun",
+                    selection_mode="single-row",
+                    key="ws_emp_table_v2",
+                    column_config={
+                        "employee_id": st.column_config.TextColumn("ID", width="small"),
+                        "employee_name": st.column_config.TextColumn("Nama Pegawai", width="medium"),
+                        "role": st.column_config.TextColumn("Peran", width="small"),
+                        "position": st.column_config.TextColumn("Jabatan", width="medium"),
+                        "unit_name": st.column_config.TextColumn("Cabang/Unit", width="small"),
+                        "skor_anomali": st.column_config.ProgressColumn("Skor Perilaku (IF)", min_value=0, max_value=100, format="%.0f"),
+                        "alert_tinggi": st.column_config.NumberColumn("Tot Alert", format="%d"),
+                        "belum_diputus": st.column_config.NumberColumn("Belum Diputus", format="%d"),
+                        "nominal_berisiko_fmt": "Eksposur Berisiko",
+                        "komunitas": st.column_config.NumberColumn("Komunitas", format="#%d"),
+                        "status_penanganan": "Status",
+                    },
+                )
+                sel_rows = getattr(getattr(emp_selection, "selection", None), "rows", []) or []
+                selected_emp_id = str(filtered_emp.iloc[sel_rows[0]]["employee_id"]) if sel_rows else str(filtered_emp.iloc[0]["employee_id"])
+                st.caption(f"Menampilkan {len(filtered_emp)} pegawai prioritas · Klik baris untuk mengganti sorotan.")
 
         with tab_p_tx:
             tx_queue = period_tx[period_tx["risk_band"].isin(["Tinggi", "Sedang"])].copy()

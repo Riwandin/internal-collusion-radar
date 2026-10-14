@@ -16,8 +16,8 @@ from .model_performance import classifier_tab
 
 def _render_model_performance(settings: dict) -> None:
     tabs = st.tabs([
-        "Classifier (Skor Transaksi)",
-        "Isolation Forest (Radar Approver)",
+        "Risk Engine & Pilar (Skor Transaksi)",
+        "Pilar 2 · Isolation Forest (Radar Approver)",
         "Graph (Komunitas Risiko)",
         "Rules (Baseline)",
         "Fairness & Keadilan",
@@ -39,7 +39,7 @@ def _render_model_performance(settings: dict) -> None:
         right.markdown("**Stabilitas & Excess-Mass**")
         right.dataframe(stability, hide_index=True, use_container_width=True)
         complementarity = services.table("if_classifier_complementarity")
-        right.markdown(f"**Saling melengkapi dengan classifier** (Spearman {settings.get('spearman_if_classifier', 0):.2f})")
+        right.markdown(f"**Saling melengkapi dengan skor transaksi** (Spearman {settings.get('spearman_if_classifier', 0):.2f})")
         right.dataframe(complementarity.style.format({"terbukti_menyetujui_kolusi": "{:.0%}"}), hide_index=True, use_container_width=True)
     with tabs[2]:
         graph = services.table("graph_evaluation")
@@ -63,7 +63,8 @@ def _render_model_performance(settings: dict) -> None:
             services.table("rule_definitions").style.format({"coverage": "{:.1%}", "precision": "{:.0%}", "recall": "{:.0%}"}),
             hide_index=True, use_container_width=True,
         )
-        st.caption("Rules dipakai sebagai baseline dan alasan. Setiap rule punya kembaran sah, sehingga rules sendirian berisik.")
+        st.caption("Rules = Pilar 1: baseline, alasan yang dipahami auditor, dan satu input penggabung. Setiap rule punya kembaran sah, "
+                   "sehingga rules sendirian berisik.")
     with tabs[4]:
         fairness = services.table("fairness")
         dimension = st.selectbox("Dimensi", fairness["dimensi"].unique(), key="mlops_fairness_dim")
@@ -116,7 +117,7 @@ def _render_score_and_shap(settings: dict) -> None:
         )
         right.plotly_chart(
             ui.style_figure(figure, "Skor naik seiring jumlah rule, tapi tidak identik",
-                            "model juga menimbang graph & riwayat; 0 rule pun bisa tinggi bila jaringannya berisiko"),
+                            "rules hanya 1 dari 4 pilar; 0 rule pun bisa tinggi bila pola relasinya berisiko"),
             use_container_width=True,
         )
     with tab_calibration:
@@ -124,8 +125,8 @@ def _render_score_and_shap(settings: dict) -> None:
         calibration = curves[curves["curve"] == "CALIBRATION"]
         figure = go.Figure()
         figure.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", line=dict(dash="dot", color=ui.MUTED), name="sempurna"))
-        for name, color in [("mentah", ui.BLUE), ("terkalibrasi", ui.ORANGE)]:
-            subset = calibration[calibration["model"] == name]
+        for name, subset in calibration.groupby("model", sort=False):
+            color = ui.ORANGE if "Risk Engine" in name else ui.BLUE
             figure.add_trace(go.Scatter(x=subset["x"], y=subset["y"], mode="lines+markers", name=name, line=dict(color=color, width=3)))
         figure.update_layout(xaxis_title="skor prediksi", yaxis_title="proporsi kolusi aktual (test 2026)")
         st.plotly_chart(
@@ -137,31 +138,36 @@ def _render_score_and_shap(settings: dict) -> None:
     with tab_shap:
         left, right = st.columns([0.9, 1.2])
         top = shap_global.head(15).iloc[::-1]
-        figure = go.Figure(go.Bar(
-            x=top["mean |SHAP|"], y=top["feature"], orientation="h",
-            marker_color=[ui.GROUP_COLORS.get(g, ui.BLUE) for g in top["kelompok"]],
-            hovertext=top["arti"],
-        ))
+        weight_column = "pengaruh terhadap skor akhir" if "pengaruh terhadap skor akhir" in shap_global else "mean |SHAP|"
+        hover = top["arti"] + (" · " + top["pilar"] if "pilar" in top else "")
+        figure = go.Figure(go.Bar(x=top[weight_column], y=top["feature"], orientation="h", hovertext=hover,
+                                  marker_color=[ui.GROUP_COLORS.get(g, ui.BLUE) for g in top["kelompok"]]))
+        if weight_column != "mean |SHAP|":
+            figure.update_layout(xaxis_tickformat=".0%")
         left.plotly_chart(
-            ui.style_figure(figure, "Fitur paling berpengaruh", "rata-rata |SHAP|; warna = kelompok fitur", height=480),
+            ui.style_figure(figure, "Fitur paling berpengaruh pada skor akhir",
+                            "porsi |SHAP| di dalam pilar × porsi pilar; warna = kelompok fitur", height=480),
             use_container_width=True,
         )
-        share = shap_global.groupby("kelompok")["mean |SHAP|"].sum()
-        left.plotly_chart(
-            ui.style_figure(px.pie(values=share.values, names=share.index, hole=.55, color=share.index, color_discrete_map=ui.GROUP_COLORS),
-                            "Porsi pengaruh per kelompok", height=280),
-            use_container_width=True,
-        )
+        share = pd.Series(settings.get("pillar_share_test", {}))
+        if len(share):
+            labels = [ui.PILLAR_LABELS[p] for p in share.index]
+            figure = px.pie(values=share.values, names=labels, hole=.55, color=labels,
+                            color_discrete_map={ui.PILLAR_LABELS[p]: ui.PILLAR_COLORS[p] for p in ui.PILLARS})
+            left.plotly_chart(ui.style_figure(figure, "Porsi pengaruh per pilar (test 2026)", height=300), use_container_width=True)
         features = top["feature"].tolist()[::-1]
         swarm = beeswarm[beeswarm["feature"].isin(features)].copy()
         swarm["persentil nilai"] = swarm.groupby("feature")["feature_value"].rank(pct=True)
+        scale = swarm.groupby("feature")["shap_value"].transform(lambda v: max(v.abs().max(), 1e-9))
+        swarm["SHAP (dinormalisasi per fitur)"] = swarm["shap_value"] / scale
         figure = px.scatter(
-            swarm, x="shap_value", y="feature", color="persentil nilai", category_orders={"feature": features},
+            swarm, x="SHAP (dinormalisasi per fitur)", y="feature", color="persentil nilai", category_orders={"feature": features},
             color_continuous_scale="RdBu_r", hover_data=["feature_value", "fraud_label"], opacity=.6,
         )
         figure.add_vline(x=0, line_color=ui.MUTED)
         right.plotly_chart(
-            ui.style_figure(figure, "Beeswarm: arah pengaruh", "merah = nilai fitur tinggi; kanan = menaikkan risiko", height=780),
+            ui.style_figure(figure, "Beeswarm: arah pengaruh di dalam pilar",
+                            "merah = nilai fitur tinggi; kanan = menaikkan skor pilarnya", height=780),
             use_container_width=True,
         )
     with tab_dependence:
@@ -186,32 +192,43 @@ def _render_model_card_and_lineage(card: dict) -> None:
     ])
     with tab_card:
         left, right = st.columns([1, 1.2])
+        pillar_card = card.get("pilar", {})
+        combiner = card.get("penggabung", {})
         with left:
-            st.markdown("##### Identitas Model")
+            st.markdown("##### Identitas Risk Engine")
             info_data = [
-                {"Atribut": "Nama Model", "Keterangan": card.get("nama", "KUR Collusion Radar — Transaction Risk Model")},
-                {"Atribut": "Algoritma Utama", "Keterangan": card.get("algoritma", "Random Forest")},
-                {"Atribut": "Metode Kalibrasi", "Keterangan": card.get("kalibrasi", "Isotonic Regression (Validation 2025)")},
-                {"Atribut": "Jumlah Pohon (n_estimators)", "Keterangan": str(card.get("hyperparameter", {}).get("n_estimators", 300))},
-                {"Atribut": "Min Samples Leaf", "Keterangan": str(card.get("hyperparameter", {}).get("min_samples_leaf", 2))},
-                {"Atribut": "Fitur Digunakan", "Keterangan": f"{len(card.get('fitur', []))} fitur (finansial, waktu, rules, graph)"},
-                {"Atribut": "Pemilik Model", "Keterangan": card.get("pemilik", "Unit Anti-Fraud Data Analytics")},
+                {"Atribut": "Nama", "Keterangan": card.get("nama", "-")},
+                {"Atribut": "Penggabung", "Keterangan": f"{combiner.get('model', '-')} · dilatih di {combiner.get('dilatih_di', '-')}"},
+                {"Atribut": "Threshold Tinggi / Sedang",
+                 "Keterangan": f"{card.get('threshold_tinggi', 0) * 100:.1f} / {card.get('threshold_sedang', 0) * 100:.1f}"},
+                {"Atribut": "Jumlah input engine", "Keterangan": f"{len(card.get('fitur', []))} kolom"},
+                {"Atribut": "Pemilik", "Keterangan": card.get("pemilik", "-")},
             ]
+            for key in ui.PILLARS:
+                detail = pillar_card.get(key, {})
+                text = f"{detail.get('jenis', '-')} · {len(detail.get('fitur', []))} input"
+                if detail.get("kalibrasi"):
+                    text += f" · {detail['kalibrasi']}"
+                info_data.append({"Atribut": ui.PILLAR_LABELS[key], "Keterangan": text})
             st.dataframe(pd.DataFrame(info_data), hide_index=True, use_container_width=True)
+            weights = combiner.get("bobot_efektif", {})
+            if weights:
+                st.markdown("**Bobot efektif pilar (dipelajari):** " + " · ".join(
+                    f"{ui.PILLAR_SHORT.get(k, k)} {ui.percent(v)}" for k, v in weights.items()))
             st.markdown("##### Batasan & Etika Model")
             for b in card.get("batasan", []):
                 st.info(f"📌 {b}")
         with right:
-            st.markdown("##### Metrik Kinerja pada Data Test (2026)")
+            st.markdown("##### Metrik Risk Engine pada Data Test (2026)")
             test_metrics = card.get("metrik_test", {})
             m_cols = st.columns(3)
-            m_cols[0].metric("Precision", f"{test_metrics.get('precision', 0.864):.1%}")
-            m_cols[1].metric("Recall", f"{test_metrics.get('recall', 0.910):.1%}")
-            m_cols[2].metric("F1-Score", f"{test_metrics.get('F1', 0.886):.3f}")
+            m_cols[0].metric("Precision", ui.percent(test_metrics.get("precision"), 1))
+            m_cols[1].metric("Recall", ui.percent(test_metrics.get("recall"), 1))
+            m_cols[2].metric("F1-Score", f"{test_metrics.get('F1', float('nan')):.3f}")
             m_cols2 = st.columns(3)
-            m_cols2[0].metric("PR-AUC", f"{test_metrics.get('PR-AUC', 0.903):.3f}")
-            m_cols2[1].metric("ROC-AUC", f"{test_metrics.get('ROC-AUC', 0.974):.3f}")
-            m_cols2[2].metric("MCC", f"{test_metrics.get('MCC', 0.869):.3f}")
+            m_cols2[0].metric("PR-AUC", f"{test_metrics.get('PR-AUC', float('nan')):.3f}")
+            m_cols2[1].metric("ROC-AUC", f"{test_metrics.get('ROC-AUC', float('nan')):.3f}")
+            m_cols2[2].metric("MCC", f"{test_metrics.get('MCC', float('nan')):.3f}")
             st.markdown("##### Model Card JSON")
             st.json(card, expanded=False)
     with tab_tuning:
@@ -240,25 +257,30 @@ def _render_model_card_and_lineage(card: dict) -> None:
             node [shape=box, style="rounded,filled", fillcolor="#eef4fc", color="#2a78d6", fontname="Helvetica"];
             data [label="7 Tabel Mentah\\n(Kredit, Log, Kasus)"];
             clean [label="Audit & Cleaning\\n(PII Masking)"];
-            feat [label="Fitur As-Of\\n(5 Rules + Graph)"];
+            feat [label="Fitur As-Of\\n+ 5 Rules + Graph bulanan"];
             split [label="Split Waktu\\nTrain 2021-24 / Val 2025 / Test 2026"];
-            train [label="Random Forest\\n+ Isotonic Calibrator", fillcolor="#e7f6ef", color="#1baf7a"];
-            iforest [label="Isolation Forest\\n(Approver-Bulan)", fillcolor="#e7f6ef", color="#1baf7a"];
-            eval [label="Evaluasi Metrik\\nPR-AUC 0.903"];
-            app [label="Streamlit Dashboard\\n(2 Role & Live Inference)", fillcolor="#fdf0e9", color="#eb6834"];
-
+            p1 [label="Pilar 1 · Rules", fillcolor="#f1f1ef", color="#8a8984"];
+            p2 [label="Pilar 2 · Isolation Forest\\n(fit s.d. 2024, tanpa label)", fillcolor="#e7f6ef", color="#1baf7a"];
+            p3 [label="Pilar 3 · Konten\\n(PyCaret + Optuna + isotonic)", fillcolor="#e7f6ef", color="#1baf7a"];
+            p4 [label="Pilar 4 · Relasi & graph\\n(PyCaret + Optuna + isotonic)", fillcolor="#e7f6ef", color="#1baf7a"];
+            stk [label="Stacking (val 2025)\\nthreshold out-of-fold", fillcolor="#fff7e0", color="#eda100"];
+            eval [label="Evaluasi test 2026\\n+ MLflow registry"];
+            app [label="Streamlit Dashboard\\n(2 Role & Live Test)", fillcolor="#fdf0e9", color="#eb6834"];
             data -> clean -> feat -> split;
-            split -> train -> eval -> app;
-            split -> iforest -> app;
+            split -> p1; split -> p2; split -> p3; split -> p4;
+            p1 -> stk; p2 -> stk; p3 -> stk; p4 -> stk; stk -> eval -> app; p2 -> app [label="radar"];
         }""")
         st.markdown(
             "**Kebijakan Pelatihan Ulang (Retraining Policy):**  \n"
             "- Evaluasi drift berkala menggunakan *Population Stability Index* (PSI).  \n"
             "- Retraining dipicu jika PSI > 0.25 pada fitur utama atau setiap kuartal dengan data terkonfirmasi baru.  \n"
-            "- Model Isolation Forest berjalan tanpa label (unsupervised) untuk mendeteksi anomali perilaku murni tanpa risiko bias konfirmasi."
+            "- PSI skor pilar (2026 vs validation 2025) memantau apakah input penggabung masih mirip data tempat bobotnya dipelajari; "
+            "kalau bergeser, latih ulang pilar dulu, lalu penggabung.  \n"
+            "- Isolation Forest berjalan tanpa label dan tetap disajikan sebagai radar terpisah agar pola baru yang belum berlabel "
+            "tidak tenggelam."
         )
     with tab_features:
-        st.markdown("##### Kamus Fitur Model Transaksi")
+        st.markdown("##### Kamus Fitur per Pilar")
         feat_df = services.table("feature_dictionary")
         if not feat_df.empty:
             st.dataframe(feat_df, hide_index=True, use_container_width=True)
@@ -360,16 +382,16 @@ def _render_ai_governance() -> None:
 def render() -> None:
     ui.page_header(
         "Kesehatan Sistem & Tata Kelola",
-        "Evaluasi metrik model (Classifier, Isolation Forest, Graph), kalibrasi & SHAP global, silsilah model, serta audit AI & guardrail",
+        "Evaluasi Risk Engine & tiap pilar, kalibrasi & SHAP 2 tingkat, silsilah model, serta audit AI & guardrail",
     )
     card = services.get_store().json_document("model_card")
     settings = services.app_settings()
 
     ui.kpi_row([
-        ("Model Transaksi", card.get("algoritma", "Random Forest"), card.get("kalibrasi", "isotonic"), ui.BLUE),
-        ("Threshold Tinggi", f"{card.get('threshold_tinggi', 0.4762) * 100:.1f}", f"Sedang ≥ {card.get('threshold_sedang', 0.2381) * 100:.1f}", ui.ORANGE),
-        ("PR-AUC Test", f"{card.get('metrik_test', {}).get('PR-AUC', 0.903):.3f}", "data uji 2026", ui.GREEN),
-        ("Independensi IF", "Terjamin (Tidak di-ensemble)", "unit analisis berbeda", ui.PURPLE),
+        ("Skor Transaksi", "Risk Engine 4 pilar", "stacking, bobot dipelajari 2025", ui.BLUE),
+        ("Threshold Tinggi", f"{card.get('threshold_tinggi', 0) * 100:.1f}", f"Sedang ≥ {card.get('threshold_sedang', 0) * 100:.1f}", ui.ORANGE),
+        ("PR-AUC Test", f"{card.get('metrik_test', {}).get('PR-AUC', float('nan')):.3f}", "data uji 2026", ui.GREEN),
+        ("Komponen terdaftar", "4 model", "IF · Konten · Relasi · Penggabung (MLflow)", ui.PURPLE),
     ])
 
     t_perf, t_shap, t_card, t_ai = st.tabs([

@@ -195,12 +195,15 @@ class InvestigationAgent:
                          f"skor {a['risk_score']:.0f} ({a['risk_band']}) · {a.get('top_reasons') or ''}" for a in output["alert"]]
                 parts.append(f"Ditemukan {output['jumlah_ditemukan']} alert; {output['ditampilkan']} teratas (sumber: cari_alert):\n" + "\n".join(lines))
             elif tool == "detail_alert":
-                reasons = "; ".join(r["alasan"] for r in output["alasan_shap"]) or "-"
+                reasons = "; ".join(f"{r['alasan']} [{r['pilar']}]" for r in output["alasan"]) or "-"
                 parts.append(f"Transaksi {output['request_id']} berskor {output['skor_risiko']:.0f}/100 (kategori {output['kategori']}). "
                              f"Requester {output['requester']}; approver {output['approver']}. Alasan utama: {reasons}. "
                              f"Red flag: {', '.join(output['red_flag']) or 'tidak ada'}. Skor anomali approver: "
                              f"{output['skor_anomali_approver'] if output['skor_anomali_approver'] is not None else '-'} (sumber: detail_alert). "
-                             "Ini indikasi berbasis data yang perlu diklarifikasi, bukan kesimpulan.")
+                             + (("Bukti jaringan: " + "; ".join(f"{e['alasan']} (batasan: {e['batasan']})"
+                                                                for e in output.get("bukti_jaringan", [])) + ". ")
+                                if output.get("bukti_jaringan") else "")
+                             + "Ini indikasi berbasis data yang perlu diklarifikasi, bukan kesimpulan.")
             elif tool == "profil_pegawai":
                 parts.append(f"{output['nama']} ({output['employee_id']}) — {output['jabatan']}, unit {output['unit']}. Alert Tinggi 2026: "
                              f"{output['alert_tinggi_2026']}. Skor anomali terakhir: {output.get('skor_anomali_terakhir', '-')} "
@@ -246,7 +249,9 @@ class InvestigationAgent:
                 lines = [f"- {m['model']}: precision {m['precision']:.0%}, recall {m['recall']:.0%}, PR-AUC {m['PR-AUC']:.3f}"
                          for m in output["classifier_test_2026"]]
                 low, high = output["fairness_FPR_model_rentang"]
+                weights = ", ".join(f"{name} {value:.0%}" for name, value in output.get("bobot_pilar_dipelajari", {}).items())
                 parts.append("Kinerja di test 2026 (sumber: performa_model):\n" + "\n".join(lines)
+                             + (f"\nBobot efektif pilar Risk Engine (dipelajari di validation 2025): {weights}." if weights else "")
                              + f"\nAlarm palsu (FPR) model antarsegmen berkisar {low:.1%}–{high:.1%}.")
         return "\n\n".join(p for p in parts if p)
 
