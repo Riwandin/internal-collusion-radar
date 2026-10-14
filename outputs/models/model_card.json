@@ -1,5 +1,5 @@
 {
-  "nama": "KUR Collusion Radar — Multi-View Risk Engine (v10)",
+  "nama": "KUR Collusion Radar — Multi-View Risk Engine (v10.1, graph heterogen)",
   "versi_data": "synthetic v6.1 (seed 2026)",
   "algoritma": "Stacking logistic regression di atas 4 pilar",
   "pilar": {
@@ -27,6 +27,8 @@
         "approve_rate",
         "top_requester_share"
       ],
+      "fitur_akses_sistem": false,
+      "seleksi_akses": "PR-AUC radar 2025 -0.040",
       "hyperparameter": {
         "n_estimators": 200,
         "max_samples": 997,
@@ -85,8 +87,43 @@
         "g_risk_comm_score",
         "g_risk_comm_size",
         "g_same_comm",
-        "g_appr_risk_pagerank"
+        "g_appr_risk_pagerank",
+        "h_debtor_n_approvers",
+        "h_debtor_n_units",
+        "h_shared_debtor_same_approver",
+        "h_pair_risky_months",
+        "h_unit_risky_pair_share"
       ],
+      "metapath_terpilih": [
+        "h_debtor_n_approvers",
+        "h_debtor_n_units",
+        "h_shared_debtor_same_approver",
+        "h_pair_risky_months",
+        "h_unit_risky_pair_share"
+      ],
+      "bukti_jaringan_di_penggabung": false,
+      "graph_heterogen": {
+        "tipe_node": [
+          "Employee",
+          "Request",
+          "Approval",
+          "Debtor",
+          "Unit",
+          "System",
+          "LoanPerformance"
+        ],
+        "relasi": [
+          "SUBMITS",
+          "REQUESTED_BY_DEBTOR",
+          "HAS_APPROVAL",
+          "DECIDED_BY",
+          "BELONGS_TO",
+          "ACCESSES",
+          "HAS_PERFORMANCE"
+        ],
+        "snapshot": "as-of awal bulan, jendela 12 bulan",
+        "uji": "34 lulus"
+      },
       "hyperparameter": {
         "n_estimators": 300,
         "max_depth": null,
@@ -108,25 +145,25 @@
       "if_missing"
     ],
     "koefisien": {
-      "logit_cls": 0.941,
-      "logit_graph": 0.749,
+      "logit_cls": 0.948,
+      "logit_graph": 0.793,
       "rule_scaled": 0.0,
-      "if_scaled": 1.978,
-      "if_missing": -0.339
+      "if_scaled": 1.809,
+      "if_missing": -0.357
     },
-    "intercept": -1.1262,
+    "intercept": -0.9189,
     "bobot_efektif": {
       "rule": 0.0,
-      "iforest": 0.1613,
-      "classifier": 0.4946,
-      "graph": 0.3441
+      "iforest": 0.1474,
+      "classifier": 0.4923,
+      "graph": 0.3603
     }
   },
-  "threshold_tinggi": 0.3497,
-  "threshold_sedang": 0.1748,
+  "threshold_tinggi": 0.3581,
+  "threshold_sedang": 0.179,
   "jaring_pengaman": {
-    "classifier": 0.556,
-    "graph": 0.8
+    "classifier": 0.4347,
+    "graph": 0.8015
   },
   "fitur": [
     "limit_ratio",
@@ -163,6 +200,11 @@
     "g_risk_comm_size",
     "g_same_comm",
     "g_appr_risk_pagerank",
+    "h_debtor_n_approvers",
+    "h_debtor_n_units",
+    "h_shared_debtor_same_approver",
+    "h_pair_risky_months",
+    "h_unit_risky_pair_share",
     "rf_near_limit",
     "rf_after_hours",
     "rf_fast_approval",
@@ -178,18 +220,22 @@
     "test": "2026 Jan–Sep"
   },
   "metrik_test": {
-    "precision": 0.8799,
-    "recall": 0.8952,
-    "F1": 0.8875,
-    "ROC-AUC": 0.975,
-    "PR-AUC": 0.9117,
-    "MCC": 0.8706
+    "precision": 0.876,
+    "recall": 0.8968,
+    "F1": 0.8863,
+    "ROC-AUC": 0.9751,
+    "PR-AUC": 0.9098,
+    "MCC": 0.8692
   },
   "batasan": [
     "Kalibrasi berlaku untuk populasi kasus yang direview audit; di seluruh transaksi skor = prioritas relatif.",
     "Bobot penggabung dipelajari dari label audit 2025; pola kolusi baru yang belum berlabel cenderung diberi bobot kecil, sehingga radar IF tetap disajikan terpisah.",
     "Data sintetis; perlu validasi ulang dengan data internal sebelum produksi.",
-    "Skor adalah indikasi, bukan bukti. Keputusan akhir oleh investigator."
+    "Skor adalah indikasi, bukan bukti. Keputusan akhir oleh investigator.",
+    "Unit & jabatan pegawai statis (data mutasi tidak tersedia); relasi lintas unit historis bisa salah tafsir.",
+    "access_logs tanpa request_id: perilaku akses hanya dianalisis per pegawai-bulan, tidak dikaitkan ke transaksi.",
+    "Keterhubungan di graph (degree, PageRank, komunitas) bukan bukti kolusi.",
+    "Riwayat NPL hanya untuk monitoring pascapencairan, tidak pernah menjadi fitur skor."
   ],
   "pemilik": "Unit Anti-Fraud (contoh)",
   "dibuat": "2026-10-14"

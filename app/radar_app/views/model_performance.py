@@ -99,6 +99,16 @@ def render() -> None:
                     ("Persistensi", f"{recent['persistensi'].mean():.2f}", "Jaccard bulan ke bulan", ui.GREEN),
                     ("Precision peringatan dini", ui.percent(recent["precision"].mean()), "", ui.ORANGE),
                     ("Lift", f"{recent['lift'].mean():.1f}×", "dibanding pegawai acak", ui.PURPLE)])
+        graph_hetero_section(settings)
+        access_selection = services.table("if_access_selection")
+        if not access_selection.empty:
+            with tabs[1]:
+                hetero = settings.get("graph_hetero", {})
+                st.markdown(f"**Kandidat fitur akses sistem (2.4b):** PR-AUC radar 2025 {hetero.get('access_gain_2025', 0):+.3f} → "
+                            + ("**dipakai** di Pilar 2." if hetero.get("use_access_features") else
+                               "**tidak dipakai** (di bawah ambang); tetap tampil sebagai konteks di Profil Pegawai."))
+                st.dataframe(access_selection, hide_index=True, use_container_width=True,
+                             column_config={"PR-AUC radar 2025": st.column_config.NumberColumn(format="%.3f")})
     with tabs[3]:
         st.dataframe(services.table("rule_definitions").style.format({"coverage": "{:.1%}", "precision": "{:.0%}", "recall": "{:.0%}"}),
                      hide_index=True, use_container_width=True)
@@ -123,3 +133,42 @@ def render() -> None:
             trials = trials.assign(percobaan=trials.groupby("model").cumcount())
             figure = px.scatter(trials, x="percobaan", y="value", color="model", labels={"value": "PR-AUC CV deret waktu"})
             st.plotly_chart(ui.style_figure(figure, "Riwayat percobaan tuning"), use_container_width=True)
+
+
+def graph_hetero_section(settings: dict) -> None:
+    """Graph heterogen: seleksi fitur metapath (validation), konfigurasi A/B0/B/C (test), dan analisis error per pola."""
+    selection, comparison = services.table("graph_feature_selection"), services.table("graph_config_comparison")
+    if selection.empty or comparison.empty:
+        return
+    hetero = settings.get("graph_hetero", {})
+    st.divider()
+    st.markdown("#### Graph heterogen: apakah fitur multi-entitas menambah informasi?")
+    st.caption(f"Kandidat metapath: {len(hetero.get('candidate_metapath_features', []))} · terpilih: "
+               f"{', '.join(hetero.get('selected_metapath_features', [])) or 'tidak ada (Pilar 4 = graph lama)'} · skor bukti jaringan "
+               + ("dipakai di penggabung" if hetero.get("use_graph_evidence") else "tidak dipakai di penggabung (redundan)")
+               + f" (Δ PR-AUC out-of-fold {hetero.get('evidence_gain_oof', 0):+.3f}, korelasi dengan S_graph "
+               f"{hetero.get('evidence_spearman_s_graph', float('nan')):.2f}).")
+    left, right = st.columns([1, 1.2])
+    with left:
+        st.markdown("**Seleksi kelompok fitur Pilar 4** (keputusan di validation; test hanya dilaporkan)")
+        st.dataframe(selection, hide_index=True, use_container_width=True,
+                     column_config={c: st.column_config.NumberColumn(format="%.4f") for c in selection.columns
+                                    if c.startswith(("PR-AUC", "kontribusi"))})
+    with right:
+        st.markdown("**Konfigurasi A · B0 · B · C** (Risk Engine utuh, test 2026)")
+        st.dataframe(comparison, hide_index=True, use_container_width=True,
+                     column_config={c: st.column_config.NumberColumn(format="%.3f") for c in comparison.columns
+                                    if c not in ("konfigurasi", "final", "FP", "FN")})
+        figure = go.Figure()
+        figure.add_bar(x=comparison["konfigurasi"], y=comparison["Δ PR-AUC vs A"],
+                       error_y=dict(type="data", symmetric=False, array=comparison["Δ CI 97,5%"] - comparison["Δ PR-AUC vs A"],
+                                    arrayminus=comparison["Δ PR-AUC vs A"] - comparison["Δ CI 2,5%"]),
+                       marker_color=[ui.ORANGE if str(f).lower() == "true" else ui.BLUE for f in comparison["final"]])
+        figure.add_hline(y=0, line_color=ui.MUTED)
+        st.plotly_chart(ui.style_figure(figure, "Tambahan PR-AUC dibanding tanpa graph", "bootstrap 95% (500×), test 2026", height=300),
+                        use_container_width=True)
+    patterns = services.table("graph_pattern_analysis")
+    if not patterns.empty:
+        st.markdown("**Analisis error per pola** (% kasus yang ditandai; label hanya untuk mengukur)")
+        st.dataframe(patterns, hide_index=True, use_container_width=True,
+                     column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ["label_kolusi", "A", "B0", "B", "C"]})

@@ -1,0 +1,15 @@
+nama,jumlah,jenis,asal,tujuan
+Request,38242,node,,
+Approval,36952,node,,
+Debtor,35016,node,,
+LoanPerformance,34016,node,,
+Employee,1537,node,,
+Unit,43,node,,
+System,5,node,,
+REQUESTED_BY_DEBTOR,38242,edge,Request,Debtor
+SUBMITS,38242,edge,Employee,Request
+HAS_APPROVAL,36952,edge,Request,Approval
+DECIDED_BY,36952,edge,Approval,Employee
+HAS_PERFORMANCE,34016,edge,Request,LoanPerformance
+ACCESSES,4466,edge,Employee,System
+BELONGS_TO,1537,edge,Employee,Unit

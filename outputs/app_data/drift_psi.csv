@@ -3,9 +3,9 @@ debtor_tenure_days,Riwayat debitur,0.19361823153499294,pantau
 debtor_loans_1y,Riwayat debitur,0.08923511903241493,stabil
 g_appr_risk_pagerank,Graph,0.054682444184413176,stabil
 s_if,Skor pilar (vs validation 2025),0.05299377842307848,stabil
-s_graph,Skor pilar (vs validation 2025),0.00397197802142273,stabil
+s_graph,Skor pilar (vs validation 2025),0.005667025937551014,stabil
 s_cls,Skor pilar (vs validation 2025),0.0038250735579530076,stabil
-risk_score,Skor pilar (vs validation 2025),0.0018897824599847725,stabil
+risk_score,Skor pilar (vs validation 2025),0.0020836558585031373,stabil
 bday_to_month_end,Transaksi,0.0016535539968990762,stabil
 s_rule,Skor pilar (vs validation 2025),0.0007993122494929748,stabil
 amount,Transaksi,0.0004702380923720814,stabil
@@ -14,5 +14,5 @@ limit_ratio,Transaksi,0.00027607149381698055,stabil
 approval_minutes,Transaksi,0.00014533114955011972,stabil
 g_same_comm,Graph,0.0,stabil
 g_risk_pair_weight,Graph,0.0,stabil
-g_risk_pair_z,Graph,0.0,stabil
 debtor_loans_30d,Riwayat debitur,0.0,stabil
+g_risk_pair_z,Graph,0.0,stabil

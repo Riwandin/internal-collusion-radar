@@ -1,35 +1,40 @@
 feature,mean |SHAP|,pilar,porsi dalam pilar,pengaruh terhadap skor akhir,kelompok,arti
-debtor_tenure_days,0.41964402101349446,Pilar 3 · Konten transaksi,0.18951819425546892,0.09201604431521376,Riwayat debitur,lama debitur jadi nasabah (hari)
-g_same_comm,0.05954793958606685,Pilar 4 · Relasi & jaringan,0.2649179311023905,0.089631761807163,Graph,requester & approver satu komunitas risiko
-limit_ratio,0.3509774154062908,Pilar 3 · Konten transaksi,0.15850721721616728,0.07695940319051019,Transaksi,nominal ÷ limit approver
-approve_hour,0.34937586132497317,Pilar 3 · Konten transaksi,0.15778392885199435,0.07660822775623657,Transaksi,jam approval
-approval_minutes,0.2830329754746325,Pilar 3 · Konten transaksi,0.1278223821637146,0.062061112537817174,Transaksi,menit dari pengajuan ke approval
-g_risk_pair_z,0.025304801699435636,Pilar 4 · Relasi & jaringan,0.1125764511714405,0.03808887384295,Graph,z red flag pasangan (0 = wajar)
-g_risk_pair_weight,0.023327971083574834,Pilar 4 · Relasi & jaringan,0.10378189202239071,0.03511334165618394,Graph,bobot hubungan di graph risiko
-amount,0.14995148479333031,Pilar 3 · Konten transaksi,0.06772057553762816,0.03288011214016912,Transaksi,nominal pengajuan
-bday_to_month_end,0.14693233292009167,Pilar 3 · Konten transaksi,0.06635707651810846,0.03221809767397623,Transaksi,sisa hari kerja sampai akhir bulan
-debtor_loans_1y,0.13110264640641328,Pilar 3 · Konten transaksi,0.05920812775802114,0.028747095913434686,Riwayat debitur,pengajuan lain ke debitur sama ≤ 1 tahun
-g_appr_risk_pagerank,0.017295314121471877,Pilar 4 · Relasi & jaringan,0.07694370059948062,0.02603296581698271,Graph,sentralitas approver di jaringan berisiko
-debtor_loans_30d,0.09769453380254599,Pilar 3 · Konten transaksi,0.044120470464877666,0.021421643349090268,Riwayat debitur,pengajuan lain ke debitur sama ≤ 30 hari
-g_risk_comm_size,0.013574442814668825,Pilar 4 · Relasi & jaringan,0.060390222253318755,0.020432297632579005,Graph,ukuran komunitas risiko requester
-pair_approval_rate,0.012389219035045307,Pilar 4 · Relasi & jaringan,0.055117377654935955,0.018648294756209837,Relasi pasangan,% pengajuan pasangan yang disetujui (1 thn)
-debtor_type,0.08439164252903406,Pilar 3 · Konten transaksi,0.03811266430945113,0.018504696194719682,Transaksi,Individual / SME
-g_debtor_n_requesters,0.012118797544149977,Pilar 4 · Relasi & jaringan,0.05391432172400704,0.018241255405596617,Graph,requester berbeda yang melayani debitur ini
-approver_position,0.08099063714868504,Pilar 3 · Konten transaksi,0.03657671391802126,0.017758952073217205,Transaksi,jabatan approver
-routing_peer_share,0.00911013883920342,Pilar 4 · Relasi & jaringan,0.04052934744868998,0.013712612059153854,Relasi pasangan,% approval rekan unit oleh unit approver ini
-business_sector,0.05799771808800797,Pilar 3 · Konten transaksi,0.026192730630191827,0.012717256366189963,Transaksi,sektor usaha debitur
-g_risk_comm_score,0.00704693400194137,Pilar 4 · Relasi & jaringan,0.03135052512960849,0.010607069099677072,Graph,skor komunitas risiko requester
-pair_prior_n,0.006592007253959282,Pilar 4 · Relasi & jaringan,0.02932663893444696,0.009922311806674468,Relasi pasangan,riwayat pasangan requester–approver
-same_unit,0.005983493761809015,Pilar 4 · Relasi & jaringan,0.026619473304386118,0.009006375222403136,Relasi pasangan,requester & approver satu unit
-requester_approver_ratio,0.005243810997492563,Pilar 4 · Relasi & jaringan,0.02332875948696528,0.007893002202195585,Relasi pasangan,pengajuan pasangan ÷ pengajuan requester (1 thn)
-requester_prior_n,0.004599232742652827,Pilar 4 · Relasi & jaringan,0.020461148300201615,0.006922780814092506,Relasi pasangan,riwayat pengajuan requester
-g_req_shared_debtors,0.004569088002527309,Pilar 4 · Relasi & jaringan,0.020327039845010997,0.006877406848419619,Graph,debitur requester yang dipakai bersama RM lain
-tenor_months,0.030650123580731763,Pilar 3 · Konten transaksi,0.013842103744736683,0.0067207037118269825,Transaksi,tenor (bulan)
-pair_share_of_approver,0.00443973375793244,Pilar 4 · Relasi & jaringan,0.01975156638454213,0.006682702398175542,Relasi pasangan,% keputusan approver dari requester ini
-pair_dependency_lift,0.003706385415113585,Pilar 4 · Relasi & jaringan,0.016489033253968537,0.0055788639708154565,Relasi pasangan,rasio pasangan ÷ porsi approver di unit requester
-g_appr_wdeg,0.003626986465775455,Pilar 4 · Relasi & jaringan,0.016135801798160408,0.005459352401409628,Graph,total transaksi approver (12 bln)
-g_pair_weight,0.0035463456007431343,Pilar 4 · Relasi & jaringan,0.015777045285757615,0.005337971496264226,Graph,frekuensi hubungan pasangan (12 bln)
-triad_prior_n,0.0027561759025399313,Pilar 4 · Relasi & jaringan,0.012261724300297821,0.004148605370938893,Relasi pasangan,riwayat requester–approver–debitur
-is_new_debtor,0.01585395349117797,Pilar 3 · Konten transaksi,0.007159908129279929,0.0034763228211671794,Riwayat debitur,debitur < 1 tahun jadi nasabah
-request_purpose,0.012694203753512422,Pilar 3 · Konten transaksi,0.005732912784188833,0.002783479226770612,Transaksi,tujuan pinjaman
-loan_product,0.002978176181656817,Pilar 3 · Konten transaksi,0.0013449937181497396,0.0006530296579658299,Transaksi,Super Mikro / Mikro / Kecil
+debtor_tenure_days,0.41964402101349446,Pilar 3 · Konten transaksi,0.18951819425546892,0.09211102483104602,Riwayat debitur,lama debitur jadi nasabah (hari)
+g_same_comm,0.053660429924370964,Pilar 4 · Relasi & jaringan,0.23663280057317765,0.0836249858609637,Graph,requester & approver satu komunitas risiko
+limit_ratio,0.3509774154062908,Pilar 3 · Konten transaksi,0.15850721721616728,0.07703884198694591,Transaksi,nominal ÷ limit approver
+approve_hour,0.34937586132497317,Pilar 3 · Konten transaksi,0.15778392885199435,0.07668730406345486,Transaksi,jam approval
+approval_minutes,0.2830329754746325,Pilar 3 · Konten transaksi,0.1278223821637146,0.06212517306688939,Transaksi,menit dari pengajuan ke approval
+g_risk_pair_z,0.023200777082051437,Pilar 4 · Relasi & jaringan,0.10231123500384787,0.03615633825864591,Graph,z red flag pasangan (0 = wajar)
+g_risk_pair_weight,0.023098827843142312,Pilar 4 · Relasi & jaringan,0.10186165728049806,0.03599745947824241,Graph,bobot hubungan di graph risiko
+amount,0.14995148479333031,Pilar 3 · Konten transaksi,0.06772057553762816,0.032914051547529403,Transaksi,nominal pengajuan
+bday_to_month_end,0.14693233292009167,Pilar 3 · Konten transaksi,0.06635707651810846,0.03225135373881776,Transaksi,sisa hari kerja sampai akhir bulan
+debtor_loans_1y,0.13110264640641328,Pilar 3 · Konten transaksi,0.05920812775802114,0.028776769151605885,Riwayat debitur,pengajuan lain ke debitur sama ≤ 1 tahun
+debtor_loans_30d,0.09769453380254599,Pilar 3 · Konten transaksi,0.044120470464877666,0.02144375513133882,Riwayat debitur,pengajuan lain ke debitur sama ≤ 30 hari
+g_appr_risk_pagerank,0.013535597475262858,Pilar 4 · Relasi & jaringan,0.05968953924739226,0.021094019356234617,Graph,sentralitas approver di jaringan berisiko
+debtor_type,0.08439164252903406,Pilar 3 · Konten transaksi,0.03811266430945113,0.018523797054824823,Transaksi,Individual / SME
+approver_position,0.08099063714868504,Pilar 3 · Konten transaksi,0.03657671391802126,0.017777283163638524,Transaksi,jabatan approver
+h_pair_risky_months,0.011062863329942023,Pilar 4 · Relasi & jaringan,0.04878522844136863,0.017240484111887597,Graph heterogen · Persistensi & unit,berapa dari 12 snapshot terakhir pasangan ini menjadi hubungan berisiko
+pair_approval_rate,0.010511100288388213,Pilar 4 · Relasi & jaringan,0.04635205312093845,0.01638061070771303,Relasi pasangan,% pengajuan pasangan yang disetujui (1 thn)
+g_risk_comm_size,0.009738445547268004,Pilar 4 · Relasi & jaringan,0.04294478531624312,0.015176497324859966,Graph,ukuran komunitas risiko requester
+business_sector,0.05799771808800797,Pilar 3 · Konten transaksi,0.026192730630191827,0.012730383333107753,Transaksi,sektor usaha debitur
+h_unit_risky_pair_share,0.007850231687285167,Pilar 4 · Relasi & jaringan,0.03461810335714277,0.012233884722499396,Graph heterogen · Persistensi & unit,porsi pasangan requester–approver dari unit requester yang berisiko di snapshot ini
+routing_peer_share,0.007335507683381218,Pilar 4 · Relasi & jaringan,0.03234826350051664,0.011431733349328656,Relasi pasangan,% approval rekan unit oleh unit approver ini
+g_risk_comm_score,0.006564555547092557,Pilar 4 · Relasi & jaringan,0.02894850387550095,0.010230273323989979,Graph,skor komunitas risiko requester
+g_debtor_n_requesters,0.006184026380812221,Pilar 4 · Relasi & jaringan,0.02727043900640462,0.009637252615905324,Graph,requester berbeda yang melayani debitur ini
+pair_prior_n,0.005887899715496756,Pilar 4 · Relasi & jaringan,0.025964573916677315,0.009175765664813769,Relasi pasangan,riwayat pasangan requester–approver
+same_unit,0.005599169652409799,Pilar 4 · Relasi & jaringan,0.024691326506355943,0.00872580565746176,Relasi pasangan,requester & approver satu unit
+h_shared_debtor_same_approver,0.005586152601993323,Pilar 4 · Relasi & jaringan,0.024633923665946456,0.008705519747368167,Graph heterogen · Debitur–pegawai,requester lain yang melayani debitur yang sama DAN memakai approver yang sama (12 bln)
+h_debtor_n_units,0.00539917955009609,Pilar 4 · Relasi & jaringan,0.023809406289464125,0.008414138950693147,Graph heterogen · Debitur–pegawai,unit requester berbeda yang pernah melayani debitur ini (12 bln)
+requester_prior_n,0.004427503699120082,Pilar 4 · Relasi & jaringan,0.019524491349538334,0.00689986894924457,Relasi pasangan,riwayat pengajuan requester
+tenor_months,0.030650123580731763,Pilar 3 · Konten transaksi,0.013842103744736683,0.0067276409357649985,Transaksi,tenor (bulan)
+requester_approver_ratio,0.004313176647489267,Pilar 4 · Relasi & jaringan,0.019020329708515266,0.006721700453583478,Relasi pasangan,pengajuan pasangan ÷ pengajuan requester (1 thn)
+pair_dependency_lift,0.003783391366705682,Pilar 4 · Relasi & jaringan,0.016684072342128976,0.005896077426013347,Relasi pasangan,rasio pasangan ÷ porsi approver di unit requester
+pair_share_of_approver,0.0037487287280699054,Pilar 4 · Relasi & jaringan,0.016531216368608073,0.0058420588005586895,Relasi pasangan,% keputusan approver dari requester ini
+g_req_shared_debtors,0.0033454978546148713,Pilar 4 · Relasi & jaringan,0.014753041072627125,0.005213659510077668,Graph,debitur requester yang dipakai bersama RM lain
+h_debtor_n_approvers,0.0033142674638182903,Pilar 4 · Relasi & jaringan,0.014615320691936821,0.005164989736233566,Graph heterogen · Debitur–pegawai,approver berbeda yang pernah memutus pengajuan debitur ini (12 bln)
+g_appr_wdeg,0.003129315242338272,Pilar 4 · Relasi & jaringan,0.013799714812469758,0.004876758223217009,Graph,total transaksi approver (12 bln)
+g_pair_weight,0.002844304545240547,Pilar 4 · Relasi & jaringan,0.01254286913414399,0.00443259451546043,Graph,frekuensi hubungan pasangan (12 bln)
+triad_prior_n,0.0026457105321673626,Pilar 4 · Relasi & jaringan,0.011667105418556787,0.004123103489042573,Relasi pasangan,riwayat requester–approver–debitur
+is_new_debtor,0.01585395349117797,Pilar 3 · Konten transaksi,0.007159908129279929,0.0034799111403262034,Riwayat debitur,debitur < 1 tahun jadi nasabah
+request_purpose,0.012694203753512422,Pilar 3 · Konten transaksi,0.005732912784188833,0.002786352381063806,Transaksi,tujuan pinjaman
+loan_product,0.002978176181656817,Pilar 3 · Konten transaksi,0.0013449937181497396,0.0006537037262136984,Transaksi,Super Mikro / Mikro / Kecil

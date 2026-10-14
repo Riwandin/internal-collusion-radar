@@ -83,3 +83,22 @@ def band_rules_text(settings: dict) -> str:
     watch = settings.get("watch_threshold", 0.25) * 100
     return (f"**Tinggi** ≥ {high:.0f} (F1 terbaik, prediksi out-of-fold 2025) · **Sedang** ≥ {watch:.0f} (½ threshold Tinggi) "
             "atau jaring pengaman pilar · **Rendah** di bawahnya")
+
+
+EVIDENCE_LABELS = {"risky_pair": "Pasangan berisiko", "persistent_pair": "Hubungan berisiko bertahan",
+                   "same_community": "Satu komunitas risiko", "shared_debtor_motif": "Motif debitur bersama",
+                   "central_approver": "Approver sentral"}
+
+
+def graph_evidence_block(request_id: str, evidence: pd.DataFrame) -> None:
+    """Bukti jaringan (graph heterogen) untuk satu berkas: relasi pemicu, node pendukung, alasan, dan batasannya."""
+    rows = evidence[evidence["request_id"].astype(str) == str(request_id)] if not evidence.empty else evidence
+    if rows is None or rows.empty:
+        return
+    st.markdown(f"**Bukti jaringan** · {len(rows)} dari {len(EVIDENCE_LABELS)} bukti terpenuhi "
+                f"(snapshot {rows['periode_snapshot'].iloc[0]}, {rows['jendela'].iloc[0]})")
+    for row in rows.itertuples(index=False):
+        st.markdown(f"- **{EVIDENCE_LABELS.get(row.bukti, row.bukti)}**: {html.escape(str(row.alasan))} "
+                    f"(`{row.fitur}` = {row.nilai:g}; relasi {html.escape(str(row.relasi))}; {html.escape(str(row.node_pendukung))})  \n"
+                    f"  <span style='color:{ui.MUTED};font-size:0.85em'>Batasan: {html.escape(str(row.batasan_interpretasi))}</span>",
+                    unsafe_allow_html=True)

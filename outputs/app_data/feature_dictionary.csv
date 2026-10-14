@@ -39,3 +39,8 @@ g_risk_comm_score,Pilar 4 · Relasi & jaringan,Graph,skor komunitas risiko reque
 g_risk_comm_size,Pilar 4 · Relasi & jaringan,Graph,ukuran komunitas risiko requester,numerik
 g_same_comm,Pilar 4 · Relasi & jaringan,Graph,requester & approver satu komunitas risiko,numerik
 g_appr_risk_pagerank,Pilar 4 · Relasi & jaringan,Graph,sentralitas approver di jaringan berisiko,numerik
+h_debtor_n_approvers,Pilar 4 · Relasi & jaringan,Graph heterogen · Debitur–pegawai,approver berbeda yang pernah memutus pengajuan debitur ini (12 bln),numerik
+h_debtor_n_units,Pilar 4 · Relasi & jaringan,Graph heterogen · Debitur–pegawai,unit requester berbeda yang pernah melayani debitur ini (12 bln),numerik
+h_shared_debtor_same_approver,Pilar 4 · Relasi & jaringan,Graph heterogen · Debitur–pegawai,requester lain yang melayani debitur yang sama DAN memakai approver yang sama (12 bln),numerik
+h_pair_risky_months,Pilar 4 · Relasi & jaringan,Graph heterogen · Persistensi & unit,berapa dari 12 snapshot terakhir pasangan ini menjadi hubungan berisiko,numerik
+h_unit_risky_pair_share,Pilar 4 · Relasi & jaringan,Graph heterogen · Persistensi & unit,porsi pasangan requester–approver dari unit requester yang berisiko di snapshot ini,numerik

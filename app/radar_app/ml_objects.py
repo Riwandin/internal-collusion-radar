@@ -197,18 +197,25 @@ class MultiViewRiskEngine:
       3. classifier S_cls   = probabilitas model KONTEN transaksi (nominal, waktu, profil & riwayat debitur)
       4. graph      S_graph = probabilitas model RELASI (pasangan requester–approver, routing, fitur graph g_*)
 
-    Fusion: LogisticRegression di atas [logit(S_cls), logit(S_graph), S_rule/100, S_IF/100, IF_kosong], dilatih di
-    validasi 2025 (di sana skor pilar out-of-sample). Karena linear di skala log-odds, skor akhir bisa diurai PERSIS:
+    Fusion: logistic regression monoton di atas [logit(p_cls mentah), logit(p_graph mentah), S_rule/100, S_IF/100,
+    IF_kosong] (+ opsional S_bukti_jaringan/100), dilatih di validasi 2025 (di sana skor pilar out-of-sample). p_* mentah
+    = probabilitas model pilar SEBELUM kalibrasi isotonic (lebih halus, tanpa tangga); S_cls/S_graph terkalibrasi dipakai
+    untuk tampilan dan jaring pengaman. Karena linear di skala log-odds, skor akhir bisa diurai PERSIS:
     logit(R) = dasar + Σ kontribusi pilar.
+
+    `use_graph_evidence=True` (konfigurasi C) menambah skor bukti jaringan yang bisa dijelaskan (radar_app.hetero_graph)
+    sebagai input kedua Pilar 4. Kontribusinya tetap dihitung ke Pilar 4, jadi tidak ada "pilar ke-5" tersembunyi.
     """
 
     STACK_COLUMNS = ["logit_cls", "logit_graph", "rule_scaled", "if_scaled", "if_missing"]
+    EVIDENCE_COLUMN = "graph_evidence_scaled"
     PILLAR_OF_COLUMN = {"logit_cls": "classifier", "logit_graph": "graph", "rule_scaled": "rule",
-                        "if_scaled": "iforest", "if_missing": "iforest"}
+                        "if_scaled": "iforest", "if_missing": "iforest", "graph_evidence_scaled": "graph"}
 
     def __init__(self, classifier_model: CalibratedRiskModel, graph_model: CalibratedRiskModel, stacker,
                  reference_means: dict, threshold: float, watch_threshold: float, escalation_thresholds: dict,
-                 model_name: str = "Multi-View Risk Engine (stacking 4 pilar)", if_neutral: float = 50.0):
+                 model_name: str = "Multi-View Risk Engine (stacking 4 pilar)", if_neutral: float = 50.0,
+                 use_graph_evidence: bool = False):
         self.classifier_model = classifier_model
         self.graph_model = graph_model
         self.stacker = stacker
@@ -218,12 +225,20 @@ class MultiViewRiskEngine:
         self.escalation_thresholds = dict(escalation_thresholds)
         self.model_name = model_name
         self.if_neutral = float(if_neutral)
+        self.use_graph_evidence = bool(use_graph_evidence)
+
+    @property
+    def stack_columns(self) -> list[str]:
+        return self.STACK_COLUMNS + ([self.EVIDENCE_COLUMN] if getattr(self, "use_graph_evidence", False) else [])
 
     # ------------------------------------------------------------------ input yang dibutuhkan
     @property
     def features(self) -> list[str]:
         """Semua kolom input yang dibaca engine (untuk form live test / validasi input)."""
         extra = RULE_COLUMNS + ["rule_score", "approver_anomaly_score"]
+        if getattr(self, "use_graph_evidence", False):
+            from radar_app.hetero_graph import EVIDENCE_COLUMNS
+            extra = extra + EVIDENCE_COLUMNS
         return list(dict.fromkeys(self.classifier_model.features + self.graph_model.features + extra))
 
     @property
@@ -242,19 +257,26 @@ class MultiViewRiskEngine:
             if_score = pd.Series(np.nan, index=df.index)
         cls_raw = self.classifier_model.raw_score(df)
         graph_raw = self.graph_model.raw_score(df)
-        return pd.DataFrame({
+        scores = pd.DataFrame({
             "s_rule": np.clip(rule_count.fillna(0).to_numpy(dtype=float) * 20.0, 0, 100),
             "s_if": if_score.to_numpy(dtype=float),
             "if_missing": if_score.isna().astype(int).to_numpy(),
             "s_cls": np.round(np.clip(self.classifier_model.calibrator.predict(cls_raw), 0, 1) * 100, 1),
             "s_graph": np.round(np.clip(self.graph_model.calibrator.predict(graph_raw), 0, 1) * 100, 1),
             "p_cls_raw": cls_raw, "p_graph_raw": graph_raw}, index=df.index)
+        if getattr(self, "use_graph_evidence", False):
+            from radar_app.hetero_graph import graph_evidence_score
+            scores["s_graph_evidence"] = graph_evidence_score(df).to_numpy()
+        return scores
 
     def stack_matrix(self, scores: pd.DataFrame) -> pd.DataFrame:
-        return pd.DataFrame({"logit_cls": _logit(scores["p_cls_raw"]), "logit_graph": _logit(scores["p_graph_raw"]),
-                             "rule_scaled": scores["s_rule"] / 100.0,
-                             "if_scaled": scores["s_if"].fillna(self.if_neutral) / 100.0,
-                             "if_missing": scores["if_missing"].astype(float)}, index=scores.index)[self.STACK_COLUMNS]
+        matrix = pd.DataFrame({"logit_cls": _logit(scores["p_cls_raw"]), "logit_graph": _logit(scores["p_graph_raw"]),
+                               "rule_scaled": scores["s_rule"] / 100.0,
+                               "if_scaled": scores["s_if"].fillna(self.if_neutral) / 100.0,
+                               "if_missing": scores["if_missing"].astype(float)}, index=scores.index)
+        if getattr(self, "use_graph_evidence", False):
+            matrix[self.EVIDENCE_COLUMN] = scores["s_graph_evidence"] / 100.0
+        return matrix[self.stack_columns]
 
     # ------------------------------------------------------------------ skor akhir
     def predict_proba(self, df: pd.DataFrame) -> np.ndarray:
@@ -264,13 +286,13 @@ class MultiViewRiskEngine:
         """Kontribusi tiap pilar ke log-odds skor akhir, relatif terhadap rata-rata validasi (jumlahnya PERSIS)."""
         scores = self.pillar_scores(df) if scores is None else scores
         matrix = self.stack_matrix(scores)
-        coefficients = dict(zip(self.STACK_COLUMNS, self.stacker.coef_[0]))
+        coefficients = dict(zip(self.stack_columns, self.stacker.coef_[0]))
         out = pd.DataFrame(index=df.index)
         for pillar in PILLAR_LABELS:
-            columns = [c for c in self.STACK_COLUMNS if self.PILLAR_OF_COLUMN[c] == pillar]
+            columns = [c for c in self.stack_columns if self.PILLAR_OF_COLUMN[c] == pillar]
             out[f"c_{pillar}"] = sum(coefficients[c] * (matrix[c] - self.reference_means[c]) for c in columns)
         out["c_base"] = float(self.stacker.intercept_[0]) + sum(coefficients[c] * self.reference_means[c]
-                                                                 for c in self.STACK_COLUMNS)
+                                                                 for c in self.stack_columns)
         return out
 
     def escalation(self, scores: pd.DataFrame) -> pd.Series:
@@ -298,19 +320,20 @@ class MultiViewRiskEngine:
         out = pd.DataFrame({"risk_probability": probability, "risk_score": np.round(probability * 100, 1),
                             "risk_band": self.risk_band(probability, escalation), "escalation": escalation.to_numpy()},
                            index=df.index)
-        return out.join(scores[["s_rule", "s_if", "s_cls", "s_graph"]]).join(self.contributions(df, scores))
+        shown = [c for c in ["s_rule", "s_if", "s_cls", "s_graph", "s_graph_evidence"] if c in scores]
+        return out.join(scores[shown]).join(self.contributions(df, scores))
 
     # ------------------------------------------------------------------ bobot untuk dilaporkan
     def learned_weights(self, reference_frame: pd.DataFrame | None = None) -> pd.DataFrame:
         """Bobot efektif = |koefisien| × simpangan baku input di data acuan, dinormalisasi jadi 100%."""
-        coefficients = dict(zip(self.STACK_COLUMNS, self.stacker.coef_[0]))
+        coefficients = dict(zip(self.stack_columns, self.stacker.coef_[0]))
         if reference_frame is not None:
             spread = self.stack_matrix(self.pillar_scores(reference_frame)).std()
         else:
-            spread = pd.Series(1.0, index=self.STACK_COLUMNS)
+            spread = pd.Series(1.0, index=self.stack_columns)
         rows = []
         for pillar, label in PILLAR_LABELS.items():
-            columns = [c for c in self.STACK_COLUMNS if self.PILLAR_OF_COLUMN[c] == pillar]
+            columns = [c for c in self.stack_columns if self.PILLAR_OF_COLUMN[c] == pillar]
             rows.append({"pilar": pillar, "label": label, "koefisien": coefficients[columns[0]],
                          "pengaruh": sum(abs(coefficients[c]) * spread[c] for c in columns)})
         frame = pd.DataFrame(rows)

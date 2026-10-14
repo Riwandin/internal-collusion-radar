@@ -16,13 +16,13 @@ from ..ui import components as ui
 from ..ui import pillars, services
 
 FINAL = "Risk Engine 4 pilar (final)"
-EARLY = "Early fusion (1 model, 40 fitur)"
+EARLY = "Early fusion (1 model, semua fitur)"
 MANUAL70 = "Bobot manual 15/20/40/25 · ambang 70 (v9.x)"
 MANUAL_VAL = "Bobot manual 15/20/40/25 · ambang val"
 LR = "Logistic Regression (baseline)"
 RULES = "Rules (rule_score)"
 PILLAR_ONLY = {"iforest": "Pilar 2 · IF saja", "classifier": "Pilar 3 · Konten saja", "graph": "Pilar 4 · Relasi saja"}
-VERSION_OF = {EARLY: "v9 · satu model, 40 fitur", MANUAL70: "v9.x · bobot manual, ambang 70", FINAL: "v10 · stacking 4 pilar"}
+VERSION_OF = {EARLY: "v9 · satu model, semua fitur", MANUAL70: "v9.x · bobot manual, ambang 70", FINAL: "v10.1 · stacking 4 pilar"}
 
 
 def _metric(frame: pd.DataFrame, model: str, column: str, default=float("nan")):
@@ -37,10 +37,13 @@ def _render_how_it_works(settings: dict) -> None:
             p1 [label="Pilar 1 · Rules SOP\\n5 red flag → S_rule", fillcolor="#f1f1ef", color="#8a8984"];
             p2 [label="Pilar 2 · Isolation Forest\\nperilaku approver 90 hari → S_IF", fillcolor="#e7f6ef", color="#1baf7a"];
             p3 [label="Pilar 3 · Konten transaksi\\nnominal, waktu, debitur → S_cls", fillcolor="#eaf2fc", color="#2a78d6"];
-            p4 [label="Pilar 4 · Relasi & jaringan\\npasangan, routing, graph → S_graph", fillcolor="#fdf0e9", color="#eb6834"];
+            p4 [label="Pilar 4 · Relasi & jaringan\\npasangan, routing, graph g_*\\n+ metapath graph heterogen → S_graph", fillcolor="#fdf0e9", color="#eb6834"];
             stk [label="Stacking\\n(logistic regression,\\nbobot dipelajari 2025)", fillcolor="#fff7e0", color="#eda100"];
             out [label="Skor risiko 0–100\\n+ band + kontribusi pilar", fillcolor="#1f2328", fontcolor="white", color="#1f2328"];
-            data -> p1; data -> p2; data -> p3; data -> p4; p1 -> stk; p2 -> stk; p3 -> stk; p4 -> stk; stk -> out; }""")
+            data -> p1; data -> p2; data -> p3; data -> p4; p1 -> stk; p2 -> stk; p3 -> stk; p4 -> stk; stk -> out;"""
+                      + ("""ev [label="Bukti jaringan\\n(graph heterogen, 5 bukti)", fillcolor="#fdf0e9", color="#eb6834"];
+            data -> ev; ev -> stk [label="input ke-2 Pilar 4"];""" if settings.get("graph_hetero", {}).get("use_graph_evidence") else "")
+                      + "}")
     with right:
         st.markdown("##### Membaca skor")
         st.markdown(
@@ -59,12 +62,15 @@ def _render_how_it_works(settings: dict) -> None:
         rows.append({"pilar": label, "pertanyaan": ui.PILLAR_QUESTION[pillar], "model": models.get(pillar, "-"),
                      "pakai label?": "ya (train 2021–2024)" if pillar in ("classifier", "graph") else "tidak",
                      "input": ", ".join(features[:8]) + (f" … (+{len(features) - 8})" if len(features) > 8 else "")
-                     if features else ("8 fitur perilaku approver" if pillar == "iforest" else "-")})
+                     if features else ("fitur perilaku approver"
+                                       + (" + akses sistem" if settings.get("graph_hetero", {}).get("use_access_features") else "")
+                                       if pillar == "iforest" else "-")})
     st.markdown("##### Empat pilar, fitur tidak tumpang tindih")
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.caption(f"Isolation Forest di-fit pada approver-bulan s.d. {settings.get('if_fit_end', '2024-12')}; skor 2025–2026 adalah "
                "persentil terhadap distribusi latih. Flag rules tidak menjadi fitur model mana pun, dan fitur graph hanya masuk Pilar 4, "
-               "sehingga satu sinyal tidak terhitung berkali-kali.")
+               "sehingga satu sinyal tidak terhitung berkali-kali. Fitur graph heterogen (metapath) dan skor bukti jaringan hanya dipakai "
+               "kalau lolos uji di validation 2025; hasilnya ada di halaman Jaringan Risiko → Graph heterogen.")
     with st.expander("Kenapa tidak memakai bobot manual (mis. 15/20/40/25)?"):
         st.markdown(
             "1. **Bobot manual adalah opini** yang tidak pernah diuji. Stacking *mengukur* tambahan informasi tiap pilar di data "
@@ -146,7 +152,7 @@ def _render_versions(settings: dict) -> None:
     ui.kpi_row([
         ("v10 · Risk Engine", f"PR-AUC {final_pr:.3f}", f"precision {ui.percent(_metric(frame, FINAL, 'precision'))} · "
                                                          f"recall {ui.percent(_metric(frame, FINAL, 'recall'))}", ui.ORANGE),
-        ("v9 · 1 model (40 fitur)", f"PR-AUC {early_pr:.3f}", f"precision {ui.percent(_metric(frame, EARLY, 'precision'))} · "
+        (f"v9 · 1 model ({settings.get('n_all_features', 'semua')} fitur)", f"PR-AUC {early_pr:.3f}", f"precision {ui.percent(_metric(frame, EARLY, 'precision'))} · "
                                                               f"recall {ui.percent(_metric(frame, EARLY, 'recall'))}", ui.BLUE),
         ("v9.x · bobot manual, ambang 70", f"recall {ui.percent(_metric(frame, MANUAL70, 'recall'))}",
          f"precision {ui.percent(_metric(frame, MANUAL70, 'precision'))} · {int(_metric(frame, MANUAL70, 'FN', 0)):,} kolusi lolos",
@@ -238,7 +244,7 @@ def render() -> None:
     ui.kpi_row([
         ("Arsitektur", "4 pilar + stacking", "Rules · IF · Konten · Relasi", ui.ORANGE),
         ("PR-AUC test 2026", f"{settings.get('test_pr_auc', float('nan')):.3f}",
-         f"1 model 40 fitur: {settings.get('early_fusion_test_pr_auc', float('nan')):.3f}", ui.BLUE),
+         f"1 model semua fitur: {settings.get('early_fusion_test_pr_auc', float('nan')):.3f}", ui.BLUE),
         ("Threshold Tinggi", f"{settings.get('final_threshold', 0) * 100:.0f}", f"Sedang ≥ {settings.get('watch_threshold', 0) * 100:.0f}",
          ui.RED),
         ("Recall test 2026", ui.percent(settings.get("test_recall", float("nan"))), "kolusi tertangkap di band Tinggi", ui.GREEN),

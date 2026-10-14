@@ -651,6 +651,7 @@ def render() -> None:
             st.markdown(
                 "**Bukti Log Sistem:** " + " · ".join(f"`{ev}`" for ev in evidence_items),
             )
+        pillars.graph_evidence_block(req_id, services.table("graph_evidence"))
 
     # =========================================================================
     # 5. PANEL TINDAKAN: CETAK PDF RINGKASAN & FORM KEPUTUSAN INVESTIGATOR

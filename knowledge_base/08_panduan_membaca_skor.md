@@ -65,6 +65,16 @@ menjadi kontribusi keempat pilar.
 - **Konteks penting**: kolom "aktif (bulan)" menunjukkan berapa bulan anggota terus muncul; komunitas yang persisten lebih
   patut diperiksa. Fitur graph per transaksi menjadi input Pilar 4.
 
+### Bukti jaringan pada satu berkas (graph heterogen)
+
+Di Meja Investigasi, berkas bisa membawa sampai 5 **bukti jaringan**: pasangan requester–approver berisiko, hubungan
+berisiko yang bertahan ≥ 3 dari 12 snapshot, requester & approver satu komunitas risiko, motif debitur bersama (debitur
+yang sama juga diajukan RM lain ke approver yang sama), dan approver yang sangat sentral di jaringan berisiko. Setiap bukti
+menampilkan relasi pemicu, node pendukung (ID pegawai/debitur), periode snapshot, nilai fitur, alasan, dan **batasan
+interpretasi**. Bukti jaringan adalah petunjuk untuk diperiksa, bukan bukti kesalahan: mutasi portofolio, pasangan kerja
+tetap, atau approver senior bisa menghasilkan pola serupa secara sah. Halaman Jaringan Risiko → Graph heterogen
+menunjukkan apakah graph terbukti membantu (perbandingan tanpa graph vs dengan graph di data test).
+
 ## Apa yang BOLEH dan TIDAK BOLEH disimpulkan
 
 | Boleh | Tidak boleh |

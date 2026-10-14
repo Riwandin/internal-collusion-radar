@@ -107,6 +107,7 @@ def render_detail(row: pd.Series, settings: dict) -> None:
         evidence = [e for e in str(row.get("evidence") or "").split(" | ") if e and e != "nan"]
         st.markdown("<ul class='evidence'>" + "".join(f"<li>{e}</li>" for e in evidence) + "</ul>" if evidence else "-",
                     unsafe_allow_html=True)
+        pillars.graph_evidence_block(str(row["request_id"]), services.table("graph_evidence"))
         anomaly_score = row.get("approver_anomaly_score")
         if pd.notna(anomaly_score):
             st.markdown(f"**Skor anomali approver (IF, model terpisah):** {anomaly_score:.0f}/100")

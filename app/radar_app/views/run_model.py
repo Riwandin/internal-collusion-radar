@@ -24,6 +24,17 @@ DEPENDENCY_MIN_PAIR_TX, DEPENDENCY_MIN_RATIO, DEPENDENCY_MIN_LIFT = 5, 0.10, 5.0
 RULE_COLUMNS = list(ui.RED_FLAG_LABELS)
 
 
+HETERO_INPUTS = {   # fitur metapath graph heterogen: (label, batas atas default, langkah)
+    "h_pair_risky_months": ("Bulan pasangan ini jadi hubungan berisiko (dari 12)", 12, 1),
+    "h_shared_debtor_same_approver": ("RM lain dengan debitur sama & approver sama", 20, 1),
+    "h_debtor_n_approvers": ("Approver berbeda untuk debitur ini (12 bln)", 20, 1),
+    "h_debtor_n_units": ("Unit berbeda yang melayani debitur ini (12 bln)", 20, 1),
+    "h_req_n_approvers": ("Approver berbeda yang dipakai requester (12 bln)", 50, 1),
+    "h_appr_n_units": ("Unit requester yang dilayani approver (12 bln)", 50, 1),
+    "h_unit_risky_pair_share": ("Porsi pasangan berisiko di unit requester", 1, 0.01),
+}
+
+
 def recompute_rules(row: dict, base: pd.Series, weekend: bool) -> dict:
     """Hitung ulang 5 rule dari input. Rule 5 hanya dihitung ulang kalau input relasinya diubah, karena notebook memakai
     jumlah transaksi pasangan 1 tahun (di sini didekati dengan riwayat pasangan)."""
@@ -141,6 +152,15 @@ def _render_single(model, settings: dict, test: pd.DataFrame) -> None:
                                       key=f"{key}_pairw")
         shared = st.number_input("Debitur yang dipakai bersama RM lain", 0, max(100, int(value_of(base, "g_req_shared_debtors"))),
                                  int(value_of(base, "g_req_shared_debtors")), key=f"{key}_shared")
+        hetero_inputs = {}
+        hetero_used = [f for f in HETERO_INPUTS if f in model.features]
+        if hetero_used:
+            st.caption("Graph heterogen (metapath, 12 bulan sebelum bulan transaksi)")
+        for feature in hetero_used:
+            label, upper, step = HETERO_INPUTS[feature]
+            current = value_of(base, feature)
+            hetero_inputs[feature] = st.number_input(label, 0.0, max(float(upper), current), current, float(step),
+                                                     key=f"{key}_{feature}")
     with col_iforest:
         st.markdown(f"**{ui.PILLAR_LABELS['iforest']}**")
         if_base = base.get("approver_anomaly_score")
@@ -155,7 +175,7 @@ def _render_single(model, settings: dict, test: pd.DataFrame) -> None:
                   debtor_loans_1y=debtor_loans_1y, debtor_loans_30d=debtor_loans_30d, loan_product=loan_product,
                   pair_prior_n=pair_prior_n, requester_approver_ratio=requester_approver_ratio,
                   pair_dependency_lift=pair_dependency_lift, g_same_comm=int(same_comm), g_risk_comm_score=comm_score,
-                  g_risk_pair_weight=pair_weight, g_req_shared_debtors=shared,
+                  g_risk_pair_weight=pair_weight, g_req_shared_debtors=shared, **hetero_inputs,
                   approver_anomaly_score=np.nan if if_missing else if_score)
     edited = recompute_rules(edited, base, weekend)
     with col_iforest:

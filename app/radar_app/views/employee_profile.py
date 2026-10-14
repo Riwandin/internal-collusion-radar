@@ -17,6 +17,8 @@ FEATURE_LABELS = {"ex_near_limit": "near-limit vs rekan", "ex_after_hours": "lua
                   "ga_risky_pairs": "[graph] pasangan berisiko", "ga_max_pair_z": "[graph] z pasangan terburuk",
                   "ga_shared_debtor_share": "[graph] % debitur bersama", "ga_comm_score": "[graph] skor komunitas",
                   "ga_comm_size": "[graph] ukuran komunitas", "ga_risk_pagerank": "[graph] sentralitas"}
+ACCESS_LABELS = {"ax_offhours_login": "login luar jam kerja", "ax_offhours_activity": "view/export luar jam kerja",
+                 "ax_export_per_login": "export per login", "ax_view_per_login": "view per login"}
 
 
 def employee_table() -> pd.DataFrame:
@@ -105,8 +107,10 @@ def render() -> None:
         figure.update_layout(barmode="group", yaxis=dict(autorange="reversed"))
         right.plotly_chart(ui.style_figure(figure, "Dibanding rekan sejabatan (bulan terakhir)", "ex_* = kelebihan dalam SD", height=460),
                            use_container_width=True)
+        render_access_context(latest, peers)
     else:
         st.info("Pegawai ini bukan approver (atau keputusannya < 10 dalam 90 hari), sehingga tidak dinilai Isolation Forest.")
+    render_npl_monitoring(employee["employee_id"])
     pairs = services.table("pair_network")
     column = "approver_id" if employee["role"] == "Requester" else "requester_id"
     own = pairs[pairs["requester_id" if employee["role"] == "Requester" else "approver_id"] == employee["employee_id"]].copy()
@@ -125,3 +129,40 @@ def render() -> None:
                      hide_index=True, use_container_width=True,
                      column_config={"risk_score": st.column_config.ProgressColumn("skor", min_value=0, max_value=100, format="%.0f"),
                                     "event_time": st.column_config.DatetimeColumn("waktu", format="DD MMM YYYY")})
+
+
+def render_access_context(latest: pd.Series, peers: pd.DataFrame) -> None:
+    """Perilaku akses sistem 90 hari terakhir (Login/View/Export) dibanding median rekan sejabatan."""
+    columns = [c for c in ACCESS_LABELS if c in latest.index and pd.notna(latest[c])]
+    if not columns:
+        return
+    in_model = bool(services.app_settings().get("graph_hetero", {}).get("use_access_features"))
+    st.markdown("**Perilaku akses sistem (90 hari, selisih terhadap median rekan sejabatan)** · "
+                + ("ikut menjadi fitur Pilar 2" if in_model else "konteks saja, tidak masuk skor (tidak lolos uji validation)"))
+    values = pd.DataFrame({"perilaku": [ACCESS_LABELS[c] for c in columns], "selisih vs rekan": [latest[c] for c in columns],
+                           "persentil di antara rekan": [(peers[c] <= latest[c]).mean() * 100 if c in peers else np.nan
+                                                         for c in columns]})
+    st.dataframe(values, hide_index=True, use_container_width=True,
+                 column_config={"selisih vs rekan": st.column_config.NumberColumn(format="%+.2f"),
+                                "persentil di antara rekan": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f")})
+    st.caption("Log akses tidak punya request_id, jadi perilaku ini tidak dikaitkan ke transaksi tertentu. Login malam bisa "
+               "sah (lembur closing); baca bersama alasan anomali lain.")
+
+
+def render_npl_monitoring(employee_id: str) -> None:
+    """Monitoring pascapencairan: porsi kredit yang sudah NPL. BUKAN fitur skor."""
+    monitoring = services.table("npl_monitoring")
+    if monitoring.empty:
+        return
+    own = monitoring[monitoring["employee_id"] == employee_id]
+    if own.empty:
+        return
+    with st.expander("Monitoring pascapencairan: kredit yang sudah NPL (bukan bagian skor)"):
+        all_roles = monitoring.groupby("peran")["porsi_npl"].median()
+        view = own.assign(**{"median pegawai lain": own["peran"].map(all_roles)})
+        st.dataframe(view[["peran", "kredit_cair", "npl_diketahui", "porsi_npl", "median pegawai lain"]], hide_index=True,
+                     use_container_width=True,
+                     column_config={"kredit_cair": "kredit cair", "npl_diketahui": "sudah NPL",
+                                    "porsi_npl": st.column_config.NumberColumn("porsi NPL", format="%.3f"),
+                                    "median pegawai lain": st.column_config.NumberColumn(format="%.3f")})
+        st.caption(str(own["catatan"].iloc[0]))

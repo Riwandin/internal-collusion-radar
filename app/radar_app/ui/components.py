@@ -12,7 +12,9 @@ BLUE, ORANGE, GREEN, YELLOW, PURPLE, RED = "#2a78d6", "#eb6834", "#1baf7a", "#ed
 INK, INK_SECONDARY, MUTED, GRID, SURFACE = "#1f2328", "#52514e", "#8a8984", "#e6e5e1", "#f6f7f9"
 BAND_COLORS = {"Tinggi": ORANGE, "Sedang": YELLOW, "Rendah": "#9ec5f0"}
 ANOMALY_COLORS = {"Perlu dilihat": ORANGE, "Pantau": YELLOW, "Normal": "#9ec5f0"}
-GROUP_COLORS = {"Transaksi": BLUE, "Riwayat debitur": PURPLE, "Relasi pasangan": YELLOW, "Graph": ORANGE, "Rules": MUTED}
+GROUP_COLORS = {"Transaksi": BLUE, "Riwayat debitur": PURPLE, "Relasi pasangan": YELLOW, "Graph": ORANGE, "Rules": MUTED,
+                "Graph heterogen · Debitur–pegawai": "#b5532a", "Graph heterogen · Jangkauan pegawai": "#d98b5f",
+                "Graph heterogen · Persistensi & unit": "#8c3b1c"}
 PILLARS = ["rule", "iforest", "classifier", "graph"]
 PILLAR_LABELS = {"rule": "Pilar 1 · Rules SOP", "iforest": "Pilar 2 · Anomali approver (IF)",
                  "classifier": "Pilar 3 · Konten transaksi", "graph": "Pilar 4 · Relasi & jaringan"}

@@ -200,7 +200,10 @@ class InvestigationAgent:
                              f"Requester {output['requester']}; approver {output['approver']}. Alasan utama: {reasons}. "
                              f"Red flag: {', '.join(output['red_flag']) or 'tidak ada'}. Skor anomali approver: "
                              f"{output['skor_anomali_approver'] if output['skor_anomali_approver'] is not None else '-'} (sumber: detail_alert). "
-                             "Ini indikasi berbasis data yang perlu diklarifikasi, bukan kesimpulan.")
+                             + (("Bukti jaringan: " + "; ".join(f"{e['alasan']} (batasan: {e['batasan']})"
+                                                                for e in output.get("bukti_jaringan", [])) + ". ")
+                                if output.get("bukti_jaringan") else "")
+                             + "Ini indikasi berbasis data yang perlu diklarifikasi, bukan kesimpulan.")
             elif tool == "profil_pegawai":
                 parts.append(f"{output['nama']} ({output['employee_id']}) — {output['jabatan']}, unit {output['unit']}. Alert Tinggi 2026: "
                              f"{output['alert_tinggi_2026']}. Skor anomali terakhir: {output.get('skor_anomali_terakhir', '-')} "

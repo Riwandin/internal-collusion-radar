@@ -1,0 +1,35 @@
+pemeriksaan,lulus,detail,cutoff
+Setiap node bertipe,True,0 node tanpa tipe,2025-01-01
+ID node memakai namespace sesuai tipe,True,0 node salah prefix,2025-01-01
+Setiap edge sesuai skema tipe asal→tujuan,True,0 edge melanggar skema,2025-01-01
+Semua timestamp edge < cutoff (tanpa kebocoran waktu),True,0 edge ≥ cutoff,2025-01-01
+Semua timestamp node < cutoff,True,0 node ≥ cutoff,2025-01-01
+"Tidak ada edge ganda (asal, tujuan, relasi)",True,0 duplikat,2025-01-01
+Tidak ada node yatim (degree 0),True,0 node yatim,2025-01-01
+Tidak ada self-loop,True,0 self-loop,2025-01-01
+Setiap Approval: 1 HAS_APPROVAL masuk & 1 DECIDED_BY keluar,True,0 approval tidak lengkap,2025-01-01
+Setiap Request punya tepat 1 pengaju (SUBMITS),True,0 request tidak lengkap,2025-01-01
+Tanpa label/outcome/PII di atribut,True,bersih,2025-01-01
+Setiap node bertipe,True,0 node tanpa tipe,2026-01-01
+ID node memakai namespace sesuai tipe,True,0 node salah prefix,2026-01-01
+Setiap edge sesuai skema tipe asal→tujuan,True,0 edge melanggar skema,2026-01-01
+Semua timestamp edge < cutoff (tanpa kebocoran waktu),True,0 edge ≥ cutoff,2026-01-01
+Semua timestamp node < cutoff,True,0 node ≥ cutoff,2026-01-01
+"Tidak ada edge ganda (asal, tujuan, relasi)",True,0 duplikat,2026-01-01
+Tidak ada node yatim (degree 0),True,0 node yatim,2026-01-01
+Tidak ada self-loop,True,0 self-loop,2026-01-01
+Setiap Approval: 1 HAS_APPROVAL masuk & 1 DECIDED_BY keluar,True,0 approval tidak lengkap,2026-01-01
+Setiap Request punya tepat 1 pengaju (SUBMITS),True,0 request tidak lengkap,2026-01-01
+Tanpa label/outcome/PII di atribut,True,bersih,2026-01-01
+Setiap node bertipe,True,0 node tanpa tipe,2026-10-01
+ID node memakai namespace sesuai tipe,True,0 node salah prefix,2026-10-01
+Setiap edge sesuai skema tipe asal→tujuan,True,0 edge melanggar skema,2026-10-01
+Semua timestamp edge < cutoff (tanpa kebocoran waktu),True,0 edge ≥ cutoff,2026-10-01
+Semua timestamp node < cutoff,True,0 node ≥ cutoff,2026-10-01
+"Tidak ada edge ganda (asal, tujuan, relasi)",True,0 duplikat,2026-10-01
+Tidak ada node yatim (degree 0),True,0 node yatim,2026-10-01
+Tidak ada self-loop,True,0 self-loop,2026-10-01
+Setiap Approval: 1 HAS_APPROVAL masuk & 1 DECIDED_BY keluar,True,0 approval tidak lengkap,2026-10-01
+Setiap Request punya tepat 1 pengaju (SUBMITS),True,0 request tidak lengkap,2026-10-01
+Tanpa label/outcome/PII di atribut,True,bersih,2026-10-01
+Deterministik: dibangun ulang dengan urutan baris diacak → sidik jari sama,True,sha256 0f4d65269532001a…,2026-10-01

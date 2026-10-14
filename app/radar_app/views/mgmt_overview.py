@@ -128,6 +128,8 @@ def render() -> None:
             )
         with c2:
             st.markdown("**🎯 Akurasi di Data Uji 2026**")
+            keep = [m for m in test_metrics.index
+                    if m == final_name or m.startswith(("Rules", "Early fusion", "Logistic")) or "ambang 70" in m]
             display_test = test_metrics.loc[keep, ["precision", "recall", "PR-AUC", "FP"]].copy()
             st.dataframe(
                 display_test,

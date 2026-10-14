@@ -161,6 +161,11 @@ class AgentTools:
         member_row = members[members["employee_id"] == row["requester_id"]]
         if len(member_row):
             community = int(member_row.iloc[0]["community_id"])
+        evidence = self.store.table("graph_evidence")
+        network_evidence = [] if evidence.empty else [
+            {"bukti": e["bukti"], "alasan": e["alasan"], "relasi": e["relasi"], "nilai": e["nilai"],
+             "batasan": e["batasan_interpretasi"]}
+            for _, e in evidence[evidence["request_id"].astype(str) == str(request_id)].iterrows()]
         return {"request_id": request_id, "tanggal_approval": str(row["approve_ts"])[:16],
                 "requester": f"{self.name_of(row['requester_id'])} ({row['requester_id']}, {row['requester_unit']})",
                 "approver": f"{self.name_of(row['approver_id'])} ({row['approver_id']}, {row['approver_position']})",
@@ -176,7 +181,9 @@ class AgentTools:
                 "red_flag": flags, "bukti": str(row.get("evidence") or "").split(" | "),
                 "skor_anomali_approver": None if pd.isna(row.get("approver_anomaly_score")) else round(float(row["approver_anomaly_score"]), 1),
                 "alasan_anomali_approver": row.get("approver_anomaly_reason") or "",
-                "komunitas_requester": community, "sudah_direview_audit": bool(row.get("reviewed")),
+                "komunitas_requester": community, "bukti_jaringan": network_evidence,
+                "skor_bukti_jaringan": None if pd.isna(row.get("graph_evidence_score")) else round(float(row["graph_evidence_score"]), 0),
+                "sudah_direview_audit": bool(row.get("reviewed")),
                 "catatan": "Skor adalah indikasi berbasis data, bukan bukti. Keputusan oleh investigator."}
 
     def profil_pegawai(self, nama_atau_id: str) -> dict:

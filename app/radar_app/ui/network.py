@@ -110,6 +110,102 @@ def plotly_network(graph: nx.Graph, title: str = "", height: int = 560):
     return figure
 
 
+HETERO_STYLE = {"approver": ("dot", GREEN, 24), "requester": ("dot", BLUE, 16), "Debtor": ("triangle", YELLOW, 13),
+                "Unit": ("box", PURPLE, 14), "System": ("database", MUTED, 14)}
+HETERO_EDGE_COLORS = {"MENGAJUKAN_KE": ORANGE, "MELAYANI_DEBITUR": YELLOW, "DIPUTUS_UNTUK_DEBITUR": GREEN,
+                      "BELONGS_TO": PURPLE, "ACCESSES": "#9a9a9a"}
+
+
+def collapse_hetero(nodes: pd.DataFrame, edges: pd.DataFrame, members: set, employees: pd.DataFrame,
+                    shared_only: bool = True) -> nx.MultiGraph:
+    """Ringkas graph heterogen untuk sekelompok pegawai: Request & Approval dilipat menjadi relasi antarentitas.
+
+    requester ─MENGAJUKAN_KE (n pengajuan)─ approver · requester ─MELAYANI_DEBITUR─ debitur ─DIPUTUS_UNTUK_DEBITUR─ approver
+    pegawai ─BELONGS_TO─ unit · pegawai ─ACCESSES─ sistem. `shared_only` = hanya debitur yang dilayani ≥ 2 requester berbeda atau diputus ≥ 2 approver berbeda.
+    """
+    member_nodes = {f"EMP:{m}" for m in members}
+    by_relation = {name: frame for name, frame in edges.groupby("relation")}
+    submits = by_relation.get("SUBMITS", pd.DataFrame(columns=["source", "target"]))
+    request_of = submits[submits["source"].isin(member_nodes)].rename(columns={"source": "requester", "target": "request"})
+    approval = by_relation.get("HAS_APPROVAL", pd.DataFrame(columns=["source", "target"])).rename(
+        columns={"source": "request", "target": "approval"})
+    decided = by_relation.get("DECIDED_BY", pd.DataFrame(columns=["source", "target"])).rename(
+        columns={"source": "approval", "target": "approver"})
+    debtor = by_relation.get("REQUESTED_BY_DEBTOR", pd.DataFrame(columns=["source", "target"])).rename(
+        columns={"source": "request", "target": "debtor"})
+    chain = (request_of[["requester", "request"]].merge(approval[["request", "approval"]], on="request", how="left")
+             .merge(decided[["approval", "approver"]], on="approval", how="left").merge(debtor[["request", "debtor"]], on="request", how="left"))
+    chain = chain[chain["approver"].isin(member_nodes)]
+    info = employees.drop_duplicates("employee_id").set_index("employee_id")
+    graph = nx.MultiGraph()
+
+    def add_employee(node_id: str):
+        raw = node_id.removeprefix("EMP:")
+        record = info.loc[raw] if raw in info.index else None
+        role = "approver" if record is not None and record.get("role") == "Approver" else "requester"
+        graph.add_node(node_id, kind=role, label=(record["employee_name"] if record is not None else raw),
+                       title=f"{record['employee_name'] if record is not None else raw} ({raw})"
+                             + (f"\n{record['position']} · {record['unit_name']}" if record is not None else ""))
+
+    for (requester, approver), group in chain.groupby(["requester", "approver"]):
+        add_employee(requester), add_employee(approver)
+        graph.add_edge(requester, approver, relation="MENGAJUKAN_KE", weight=len(group),
+                       title=f"{len(group)} pengajuan antar anggota (12 bln)")
+    links = pd.concat([chain[["requester", "debtor"]].rename(columns={"requester": "employee"}).assign(relation="MELAYANI_DEBITUR"),
+                       chain[["approver", "debtor"]].rename(columns={"approver": "employee"}).assign(relation="DIPUTUS_UNTUK_DEBITUR")])
+    links = links.dropna(subset=["debtor"])
+    reach = links.groupby(["debtor", "relation"])["employee"].nunique().unstack(fill_value=0).max(axis=1)
+    keep = reach[reach >= 2].index if shared_only else reach.index   # ≥ 2 requester berbeda ATAU ≥ 2 approver berbeda
+    debtor_info = nodes.set_index("node_id") if "node_id" in nodes else pd.DataFrame()
+    for (employee, debtor_node, relation), group in links[links["debtor"].isin(keep)].groupby(["employee", "debtor", "relation"]):
+        attrs = debtor_info.loc[debtor_node] if debtor_node in debtor_info.index else {}
+        graph.add_node(debtor_node, kind="Debtor", label=debtor_node.removeprefix("DEB:"),
+                       title=f"Debitur {debtor_node.removeprefix('DEB:')} · {attrs.get('debtor_type', '?')} · "
+                             f"{attrs.get('business_sector', '?')} · {int(reach[debtor_node])} requester/approver berbeda")
+        graph.add_edge(employee, debtor_node, relation=relation, weight=len(group),
+                       title=f"{'mengajukan' if relation == 'MELAYANI_DEBITUR' else 'memutus'} {len(group)}× untuk debitur ini")
+    present = [n for n in graph if n.startswith("EMP:")]
+    for relation in ("BELONGS_TO", "ACCESSES"):
+        frame = by_relation.get(relation, pd.DataFrame(columns=["source", "target"]))
+        for row in frame[frame["source"].isin(present)].itertuples(index=False):
+            kind = "Unit" if relation == "BELONGS_TO" else "System"
+            graph.add_node(row.target, kind=kind, label=row.target.split(":", 1)[1], title=row.target.split(":", 1)[1])
+            title = "anggota unit" if relation == "BELONGS_TO" else (
+                f"{int(getattr(row, 'n_events', 0) or 0)} aktivitas Login/View/Export · "
+                f"{float(getattr(row, 'offhours_share', 0) or 0):.0%} di luar jam kerja")
+            graph.add_edge(row.source, row.target, relation=relation, weight=1, title=title)
+    return graph
+
+
+def hetero_html(graph: nx.MultiGraph, height: int = 560) -> str | None:
+    try:
+        from pyvis.network import Network
+    except Exception:
+        return None
+    network = Network(height=f"{height}px", width="100%", bgcolor="#ffffff", font_color="#1f2328", directed=False,
+                      cdn_resources="in_line")
+    for node, data in graph.nodes(data=True):
+        shape, color, size = HETERO_STYLE[data["kind"]]
+        network.add_node(node, label=str(data["label"]), title=data["title"], shape=shape, color=color, size=size)
+    max_weight = max([d["weight"] for *_, d in graph.edges(data=True)] or [1])
+    for a, b, data in graph.edges(data=True):
+        network.add_edge(a, b, width=1 + 5 * data["weight"] / max_weight, color=HETERO_EDGE_COLORS[data["relation"]],
+                         title=data["title"], dashes=data["relation"] in ("BELONGS_TO", "ACCESSES"))
+    network.set_options("""{"physics": {"barnesHut": {"gravitationalConstant": -7000, "springLength": 120},
+                            "stabilization": {"iterations": 200}},
+                            "interaction": {"hover": true, "navigationButtons": true, "tooltipDelay": 80},
+                            "nodes": {"font": {"size": 12, "face": "Inter"}}}""")
+    return network.generate_html()
+
+
+HETERO_LEGEND_HTML = (f"<span class='chip'>● <b style='color:{GREEN}'>approver</b></span>"
+                      f"<span class='chip'>● <b style='color:{BLUE}'>requester</b></span>"
+                      f"<span class='chip'>▲ <b style='color:{YELLOW}'>debitur</b> (≥ 2 RM / approver)</span>"
+                      f"<span class='chip'>■ <b style='color:{PURPLE}'>unit</b></span>"
+                      f"<span class='chip'>⛁ <b style='color:{MUTED}'>sistem</b></span>"
+                      f"<span class='chip'><b style='color:{ORANGE}'>━</b> pengajuan antar anggota</span>"
+                      f"<span class='chip'>garis putus = keanggotaan unit / akses sistem</span>")
+
 LEGEND_HTML = (f"<span class='chip'>● <b style='color:{GREEN}'>hijau</b> = approver</span>"
                f"<span class='chip'>● <b style='color:{BLUE}'>biru</b> = requester (RM/CA)</span>"
                f"<span class='chip'><b style='color:{ORANGE}'>━</b> red flag di atas wajar</span>"

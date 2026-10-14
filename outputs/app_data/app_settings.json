@@ -1,6 +1,6 @@
 {
-  "final_threshold": 0.3496603269383413,
-  "watch_threshold": 0.17483016346917066,
+  "final_threshold": 0.35807721417979604,
+  "watch_threshold": 0.17903860708989802,
   "rules_threshold": 1,
   "if_top_quantile": 0.95,
   "model_name": "Risk Engine 4 pilar",
@@ -13,17 +13,55 @@
   "investigators_available": 6,
   "hours_per_investigator_month": 120,
   "months_2026": 9,
-  "test_recall": 0.8952380952380953,
+  "test_recall": 0.8968253968253969,
   "rules_test_recall": 0.846031746031746,
   "rules_alerts_per_month": 338.77777777777777,
-  "model_alerts_per_month": 123.33333333333333,
+  "model_alerts_per_month": 122.55555555555556,
   "shap_method": "shap.TreeExplainer",
   "screening_engine": "PyCaret compare_models",
   "tuning_engine": "Optuna TPE + MedianPruner",
   "problem_statement": "Kolusi internal pada approval KUR meningkat 4.8× dalam 4 tahun (3,7% → 17,8% kasus yang direview), terkonsentrasi di jaringan unit tertentu (30% kasus kolusi dari 4 unit), dan memuncak saat tekanan target akhir bulan. Kredit hasil kolusi 12× lebih sering macet dan selama ini baru terdeteksi ±8 bulan setelah dana cair, dengan potensi kerugian ±Rp11.5 M per tahun. Dibutuhkan sistem yang mendeteksi indikasi kolusi sesaat setelah approval (sebelum dana cair), menjelaskan buktinya, dan tetap menyerahkan keputusan kepada manusia.",
   "data_end_date": "2026-09-30",
-  "spearman_if_classifier": 0.4875044471945656,
-  "architecture": "Multi-View Risk Engine v10: 4 pilar (Rules, Isolation Forest, Konten, Relasi) + stacking",
+  "spearman_if_classifier": 0.4841051029715553,
+  "architecture": "Multi-View Risk Engine v10.1: 4 pilar (Rules, Isolation Forest, Konten, Relasi) + graph heterogen + stacking",
+  "n_all_features": 45,
+  "stack_columns": [
+    "logit_cls",
+    "logit_graph",
+    "rule_scaled",
+    "if_scaled",
+    "if_missing"
+  ],
+  "graph_hetero": {
+    "snapshot_cutoff": "2026-10-01",
+    "nodes": 145811,
+    "edges": 190407,
+    "fingerprint": "0f4d65269532001a",
+    "checks_passed": 34,
+    "checks_total": 34,
+    "candidate_metapath_features": [
+      "h_debtor_n_approvers",
+      "h_debtor_n_units",
+      "h_req_n_approvers",
+      "h_appr_n_units",
+      "h_shared_debtor_same_approver",
+      "h_pair_risky_months",
+      "h_unit_risky_pair_share"
+    ],
+    "selected_metapath_features": [
+      "h_debtor_n_approvers",
+      "h_debtor_n_units",
+      "h_shared_debtor_same_approver",
+      "h_pair_risky_months",
+      "h_unit_risky_pair_share"
+    ],
+    "use_graph_evidence": false,
+    "evidence_gain_oof": 0.0009280928870712968,
+    "evidence_spearman_s_graph": 0.6561780248924132,
+    "use_access_features": false,
+    "access_gain_2025": -0.03983952891643083,
+    "final_config": "B · + metapath terpilih"
+  },
   "pillar_names": {
     "rule": "Pilar 1 · Rules SOP",
     "iforest": "Pilar 2 · Anomali approver (IF)",
@@ -38,18 +76,18 @@
   },
   "fusion_weights": {
     "rule": 0.0,
-    "iforest": 0.16132649458107937,
-    "classifier": 0.4946123185286649,
-    "graph": 0.3440611868902557
+    "iforest": 0.14739460213956623,
+    "classifier": 0.4922909344078966,
+    "graph": 0.3603144634525372
   },
   "fusion_coefficients": {
-    "logit_cls": 0.941,
-    "logit_graph": 0.749,
+    "logit_cls": 0.948,
+    "logit_graph": 0.793,
     "rule_scaled": 0.0,
-    "if_scaled": 1.978,
-    "if_missing": -0.339
+    "if_scaled": 1.809,
+    "if_missing": -0.357
   },
-  "fusion_intercept": -1.1262341236630666,
+  "fusion_intercept": -0.9188913369729539,
   "manual_weights_v9x": {
     "rule": 0.15,
     "iforest": 0.2,
@@ -57,17 +95,17 @@
     "graph": 0.25
   },
   "escalation_thresholds": {
-    "classifier": 0.556,
-    "graph": 0.8
+    "classifier": 0.4346634217738601,
+    "graph": 0.8014705882352942
   },
   "pillar_share_test": {
     "rule": 0.0,
-    "iforest": 0.1761359784638095,
-    "classifier": 0.48552617692830546,
-    "graph": 0.3383378446078851
+    "iforest": 0.16057707451339326,
+    "classifier": 0.48602734525256786,
+    "graph": 0.3533955802340388
   },
   "if_fit_end": "2024-12",
-  "test_pr_auc": 0.9117260199549041,
-  "early_fusion_test_pr_auc": 0.895540122114409,
+  "test_pr_auc": 0.909757788081881,
+  "early_fusion_test_pr_auc": 0.9027143729688777,
   "watch_recall_validation": 0.9253472222222222
 }
