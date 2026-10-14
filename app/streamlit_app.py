@@ -30,17 +30,17 @@ def login_page() -> None:
         st.markdown("<div class='page-subtitle'>Deteksi indikasi kolusi requester ↔ approver pada persetujuan KUR</div>",
                     unsafe_allow_html=True)
 
-        st.markdown("##### ⚡ Masuk Cepat (1-Klik Demo)")
+        st.markdown("##### Masuk Cepat (1-Klik Demo)")
         q1, q2 = st.columns(2)
         users = {u["role"]: u for u in demo_users()}
 
-        if q1.button("🔍 Masuk: Investigator", type="primary", use_container_width=True):
+        if q1.button("Masuk: Investigator", type="primary", use_container_width=True):
             user = {"username": "investigator", "display_name": users["investigator"]["display_name"], "role": "investigator"}
             services.get_store().record_login("investigator", "investigator", True)
             st.session_state["user"] = user
             st.rerun()
 
-        if q2.button("📊 Masuk: Manajemen", type="secondary", use_container_width=True):
+        if q2.button("Masuk: Manajemen", type="secondary", use_container_width=True):
             user = {"username": "manajemen", "display_name": users["manajemen"]["display_name"], "role": "manajemen"}
             services.get_store().record_login("manajemen", "manajemen", True)
             st.session_state["user"] = user
@@ -122,7 +122,7 @@ if user["role"] == "investigator":
         "Menu Investigator": [
             page(inv_overview.render, "Overview", ":material/person_search:", "overview", True),
             page(network.render, "Peta Jaringan & Komplotan", ":material/hub:", "jaringan"),
-            page(run_model.render, "Cek Berkas Baru (Live Test)", ":material/play_circle:", "live-test"),
+            # page(run_model.render, "Cek Berkas Baru (Live Test)", ":material/play_circle:", "live-test"),
             page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),
         ],
     }
