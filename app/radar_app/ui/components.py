@@ -9,6 +9,8 @@ import plotly.io as pio
 import streamlit as st
 
 BLUE, ORANGE, GREEN, YELLOW, PURPLE, RED = "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#7b5cd6", "#c2362b"
+# Warna Khas BNI (Sesuai Swatch Resmi)
+BNI_TEAL, BNI_MINT, BNI_ORANGE, BNI_PEACH = "#045f6a", "#d8fff8", "#f05b24", "#ffd8cb"
 INK, INK_SECONDARY, MUTED, GRID, SURFACE = "#1f2328", "#52514e", "#8a8984", "#e6e5e1", "#f6f7f9"
 BAND_COLORS = {"Tinggi": ORANGE, "Sedang": YELLOW, "Rendah": "#9ec5f0"}
 ANOMALY_COLORS = {"Perlu dilihat": ORANGE, "Pantau": YELLOW, "Normal": "#9ec5f0"}
@@ -63,13 +65,49 @@ CSS = f"""
     padding: 10px 14px;
     margin-bottom: 8px;
 }}
+.card-header-badge {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #eb5757;
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-right: 8px;
+}}
+.card-title-box {{
+    display: flex;
+    align-items: center;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: {INK};
+    margin-bottom: 8px;
+}}
+.driver-card {{
+    background: white;
+    border: 1px solid {GRID};
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}}
 .exec-card {{
     background: white;
     border: 1px solid {GRID};
     border-radius: 12px;
-    padding: 16px 18px;
+    padding: 14px 16px;
     box-shadow: 0 1px 3px rgba(0,0,0,.03);
+    min-height: 124px;
     height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }}
 .exec-stat-box {{
     background: white;

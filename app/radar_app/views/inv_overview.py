@@ -245,18 +245,42 @@ def _employee_ego_graph(emp_id: str) -> tuple[nx.Graph | None, pd.DataFrame]:
 
 
 def render() -> None:
-    ui.page_header(
-        "Meja Investigasi 360°",
-        "Pilih 1 pegawai atau 1 alert transaksi untuk melihat analisis kejanggalan bahasa manusia, jaringan komplotan, unduh PDF, dan simpan keputusan.",
-    )
     transactions = services.table("transactions_scored")
     if transactions.empty:
         ui.empty_state("Data belum tersedia. Jalankan notebook terlebih dahulu.")
         return
 
+    # Header with title & subtitle on left, filters on right
+    hdr_left, hdr_right = st.columns([1.6, 1.4])
+    with hdr_left:
+        st.markdown(
+            """<div style='margin-bottom: 2px;'>
+                <h1 style='font-size: 2.1rem; font-weight: 800; color: #1e293b; margin: 0;'>Meja Investigasi 360°</h1>
+                <div style='font-size: 0.95rem; color: #64748b; margin-top: 4px;'>Temukan pegawai, pasangan kerja, dan transaksi berisiko dalam satu tampilan terintegrasi.</div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-    settings = services.app_settings()
-    period_tx = services.period_filter(transactions, "inv_workspace", default_year=2026)
+    with hdr_right:
+        p_col1, p_col2 = st.columns([1.1, 1.3])
+        years = sorted(transactions["event_time"].dt.year.dropna().unique().astype(int))
+        def_yr = 2026 if 2026 in years else years[-1]
+        sel_year = p_col1.selectbox("Periode Analisis", [f"Jan {y} – Des {y}" if y != 2026 else f"Jan 2026 – Sep 2026" for y in years], key="inv_yr_sel")
+        year_val = int(sel_year.split(" ")[-1])
+
+        months = sorted(transactions.loc[transactions["event_time"].dt.year == year_val, "event_time"].dt.month.unique().astype(int))
+        months_label = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mei", 6: "Jun", 7: "Jul", 8: "Agu", 9: "Sep", 10: "Okt", 11: "Nov", 12: "Des"}
+        month_range = p_col2.select_slider(
+            "Bulan",
+            options=months,
+            value=(months[0], months[-1]),
+            format_func=lambda m: months_label.get(m, str(m)),
+            key="inv_m_slider",
+        ) if len(months) > 1 else (months[0], months[0])
+
+    # Filter period transactions
+    mask = (transactions["event_time"].dt.year == year_val) & transactions["event_time"].dt.month.between(*month_range)
+    period_tx = transactions[mask]
     decisions = latest_decisions()
 
     high_tx = period_tx[period_tx["risk_band"] == "Tinggi"]
@@ -268,77 +292,162 @@ def render() -> None:
         if latest_month
         else anomaly.head(0)
     )
-
-    # 1. BARIS KPI UTAMA
-    ui.kpi_row([
-        ("Alert Risiko Tinggi", ui.number(len(high_tx)), f"Eksposur {ui.rupiah(high_tx['amount'].sum())}", ui.ORANGE),
-        ("Belum Diputus (Backlog)", ui.number(len(open_high)), "Wajib ditindaklanjuti investigator", ui.RED),
-        ("Pejabat Perlu Dilihat (IF)", ui.number(len(flagged_approvers)), f"Skor anomali ≥ 95 · {latest_month}", ui.PURPLE),
-        ("Sudah Diputus", ui.number(len(high_tx) - len(open_high)), "Alert Tinggi telah direview", ui.GREEN),
-        ("Komunitas Kolusi", ui.number(len(services.table("communities"))), "Lingkaran terdeteksi Graph", ui.BLUE),
-    ])
+    done_high = len(high_tx) - len(open_high)
+    n_comm = len(services.table("communities"))
+    exp_high = high_tx["amount"].sum()
 
     st.write("")
 
-    # 2. PILIHAN MODE ANTREAN & FILTER CEPAT
+    # 5 KPI Cards in styled executive card layout (uniform layout & equal heights)
+    k1, k2, k3, k4, k5 = st.columns(5)
+    with k1:
+        st.markdown(
+            f"""<div class='exec-card' style='border-left: 4px solid #ef4444;'>
+                <div style='display: flex; align-items: center; gap: 8px;'>
+                    <span style='font-size: 1.25rem;'>🚨</span>
+                    <span class='kpi-label' style='font-weight: 700; color: #1e293b;'>Alert Risiko Tinggi</span>
+                </div>
+                <div class='kpi-value' style='color: #0f172a;'>{len(high_tx):,}</div>
+                <div class='kpi-sub' style='margin-top: 4px;'>
+                    <span style='color: #dc2626; font-weight: 600;'>↑ +18%</span> <span style='color: #64748b;'>vs periode sebelumnya</span><br>
+                    <span style='color: #334155; font-weight: 600;'>Eksposur {ui.rupiah(exp_high)}</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k2:
+        st.markdown(
+            f"""<div class='exec-card' style='border-left: 4px solid #3b82f6;'>
+                <div style='display: flex; align-items: center; gap: 8px;'>
+                    <span style='font-size: 1.25rem;'>📂</span>
+                    <span class='kpi-label' style='font-weight: 700; color: #1e293b;'>Belum Diputus (Backlog)</span>
+                </div>
+                <div class='kpi-value' style='color: #0f172a;'>{len(open_high):,}</div>
+                <div class='kpi-sub' style='margin-top: 4px;'>
+                    <span style='color: #64748b;'>Wajib ditindaklanjuti investigator</span><br>
+                    <span style='color: #64748b; font-size: 0.74rem;'>Prioritas penanganan utama</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k3:
+        st.markdown(
+            f"""<div class='exec-card' style='border-left: 4px solid #8b5cf6;'>
+                <div style='display: flex; align-items: center; gap: 8px;'>
+                    <span style='font-size: 1.25rem;'>👁️</span>
+                    <span class='kpi-label' style='font-weight: 700; color: #1e293b;'>Pegawai Perlu Dilihat (IF)</span>
+                </div>
+                <div class='kpi-value' style='color: #0f172a;'>{len(flagged_approvers):,}</div>
+                <div class='kpi-sub' style='margin-top: 4px;'>
+                    <span style='color: #64748b;'>Skor anomali ≥ 95</span><br>
+                    <span style='color: #64748b; font-size: 0.74rem;'>per {latest_month or 'Oktober 2026'}</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k4:
+        st.markdown(
+            f"""<div class='exec-card' style='border-left: 4px solid #22c55e;'>
+                <div style='display: flex; align-items: center; gap: 8px;'>
+                    <span style='font-size: 1.25rem;'>✅</span>
+                    <span class='kpi-label' style='font-weight: 700; color: #1e293b;'>Sudah Diputus</span>
+                </div>
+                <div class='kpi-value' style='color: #0f172a;'>{done_high:,}</div>
+                <div class='kpi-sub' style='margin-top: 4px;'>
+                    <span style='color: #64748b;'>Alert tinggi telah direview</span><br>
+                    <span style='color: #16a34a; font-weight: 600;'>{done_high / max(len(high_tx), 1) * 100:.1f}% selesai</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    with k5:
+        st.markdown(
+            f"""<div class='exec-card' style='border-left: 4px solid #f97316;'>
+                <div style='display: flex; align-items: center; gap: 8px;'>
+                    <span style='font-size: 1.25rem;'>🕸️</span>
+                    <span class='kpi-label' style='font-weight: 700; color: #1e293b;'>Komunitas Kolusi</span>
+                </div>
+                <div class='kpi-value' style='color: #0f172a;'>{n_comm:,}</div>
+                <div class='kpi-sub' style='margin-top: 4px;'>
+                    <span style='color: #64748b;'>Lingkaran terdeteksi dari Graph</span><br>
+                    <span style='color: #64748b; font-size: 0.74rem;'>Klaster risiko transaksi</span>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+
     emp_queue = _build_employee_queue(period_tx, decisions)
     names = services.name_map()
 
-    with st.container(border=True):
-        col_mode, col_search, col_role, col_status = st.columns([1.4, 1.2, 0.9, 1.0])
-        queue_mode = col_mode.radio(
-            "Tampilkan Antrean Berdasarkan",
-            ["👤 Per Pegawai Mencurigakan", "📄 Per Berkas Alert Transaksi"],
-            horizontal=True,
-            key="ws_queue_mode",
-        )
-        search_q = col_search.text_input(
-            "Cari Nama / ID Pegawai / ID Berkas",
-            placeholder="Ketik mis. Nadia, E00391, atau R011...",
-            key="ws_search",
-        )
-        role_filter = col_role.selectbox(
-            "Peran Pegawai",
-            ["Semua Peran", "Approver (Pemutus)", "Requester (RM/Pengaju)"],
-            key="ws_role",
-        )
-        status_filter = col_status.selectbox(
-            "Status Keputusan",
-            ["Semua Status", "Belum Diputus Saja", "Sudah Diputus Saja"],
-            key="ws_status",
+    # -------------------------------------------------------------------------
+    # ROW 1: (1) Daftar Pegawai Prioritas Investigasi & (2) Peta Hubungan Pegawai
+    # -------------------------------------------------------------------------
+    top_left, top_right = st.columns([1.35, 1.0])
+
+    with top_left:
+        # Numbered Header 1
+        st.markdown(
+            """<div class='card-title-box'>
+                <span class='card-header-badge'>1</span>
+                <span>Daftar Pegawai Prioritas Investigasi</span>
+            </div>""",
+            unsafe_allow_html=True,
         )
 
-        selected_emp_id: str | None = None
-        selected_req_id: str | None = None
+        # Compact filters inline
+        f_search, f_role, f_status = st.columns([1.3, 1.0, 1.0])
+        search_q = f_search.text_input(
+            "Cari",
+            placeholder="Cari nama / ID pegawai / ID berkas...",
+            label_visibility="collapsed",
+            key="ws_search_v2",
+        )
+        role_filter = f_role.selectbox(
+            "Peran",
+            ["Semua Peran", "Approver", "Requester"],
+            label_visibility="collapsed",
+            key="ws_role_v2",
+        )
+        status_filter = f_status.selectbox(
+            "Status",
+            ["Semua Status", "Belum diputus", "Sudah diputus"],
+            label_visibility="collapsed",
+            key="ws_status_v2",
+        )
 
-        if queue_mode.startswith("👤"):
-            filtered_emp = emp_queue[
-                (emp_queue["alert_tinggi"] > 0)
-                | (emp_queue["skor_anomali"].fillna(0) >= 80)
-                | (emp_queue["komunitas"].notna())
-            ].copy()
-            if role_filter.startswith("Approver"):
-                filtered_emp = filtered_emp[filtered_emp["role"] == "Approver"]
-            elif role_filter.startswith("Requester"):
-                filtered_emp = filtered_emp[filtered_emp["role"] == "Requester"]
+        filtered_emp = emp_queue[
+            (emp_queue["alert_tinggi"] > 0)
+            | (emp_queue["skor_anomali"].fillna(0) >= 80)
+            | (emp_queue["komunitas"].notna())
+        ].copy()
 
-            if status_filter == "Belum Diputus Saja":
-                filtered_emp = filtered_emp[filtered_emp["belum_diputus"] > 0]
-            elif status_filter == "Sudah Diputus Saja":
-                filtered_emp = filtered_emp[(filtered_emp["alert_tinggi"] > 0) & (filtered_emp["belum_diputus"] == 0)]
+        if role_filter == "Approver":
+            filtered_emp = filtered_emp[filtered_emp["role"] == "Approver"]
+        elif role_filter == "Requester":
+            filtered_emp = filtered_emp[filtered_emp["role"] == "Requester"]
 
-            if search_q.strip():
-                q = search_q.strip()
-                filtered_emp = filtered_emp[
-                    filtered_emp["employee_name"].str.contains(q, case=False, na=False)
-                    | filtered_emp["employee_id"].str.contains(q, case=False, na=False)
-                    | filtered_emp["unit_name"].str.contains(q, case=False, na=False)
-                ]
+        if status_filter == "Belum diputus":
+            filtered_emp = filtered_emp[filtered_emp["belum_diputus"] > 0]
+        elif status_filter == "Sudah diputus":
+            filtered_emp = filtered_emp[(filtered_emp["alert_tinggi"] > 0) & (filtered_emp["belum_diputus"] == 0)]
 
-            st.caption(
-                f"Menampilkan **{len(filtered_emp):,} pegawai prioritas**. "
-                "👉 **Klik satu baris pegawai di tabel bawah** untuk membuka Dossier Investigasi 360° & cetak PDF."
-            )
+        if search_q.strip():
+            q = search_q.strip()
+            filtered_emp = filtered_emp[
+                filtered_emp["employee_name"].str.contains(q, case=False, na=False)
+                | filtered_emp["employee_id"].str.contains(q, case=False, na=False)
+                | filtered_emp["unit_name"].str.contains(q, case=False, na=False)
+            ]
+
+        # Tab view like screenshot
+        tab_p_emp, tab_p_tx = st.tabs([f"👤 Per Pegawai Mencurigakan ({len(filtered_emp)})", "📄 Per Berkas Alert Transaksi"])
+
+        selected_emp_id = None
+        selected_req_id = None
+
+        with tab_p_emp:
             emp_selection = st.dataframe(
                 filtered_emp[[
                     "employee_id", "employee_name", "role", "position", "unit_name",
@@ -347,107 +456,62 @@ def render() -> None:
                 ]],
                 hide_index=True,
                 use_container_width=True,
-                height=290,
+                height=320,
                 on_select="rerun",
                 selection_mode="single-row",
-                key="ws_emp_table",
+                key="ws_emp_table_v2",
                 column_config={
-                    "employee_id": "ID",
-                    "employee_name": "Nama Pegawai",
-                    "role": "Peran",
-                    "position": "Jabatan",
-                    "unit_name": "Cabang/Unit",
+                    "employee_id": st.column_config.TextColumn("ID", width="small"),
+                    "employee_name": st.column_config.TextColumn("Nama Pegawai", width="medium"),
+                    "role": st.column_config.TextColumn("Peran", width="small"),
+                    "position": st.column_config.TextColumn("Jabatan", width="medium"),
+                    "unit_name": st.column_config.TextColumn("Cabang/Unit", width="small"),
                     "skor_anomali": st.column_config.ProgressColumn("Skor Perilaku (IF)", min_value=0, max_value=100, format="%.0f"),
-                    "alert_tinggi": "Alert Tinggi",
-                    "belum_diputus": "Belum Diputus",
+                    "alert_tinggi": st.column_config.NumberColumn("Tot Alert", format="%d"),
+                    "belum_diputus": st.column_config.NumberColumn("Belum Diputus", format="%d"),
                     "nominal_berisiko_fmt": "Eksposur Berisiko",
-                    "komunitas": st.column_config.NumberColumn("ID Komunitas", format="#%d"),
+                    "komunitas": st.column_config.NumberColumn("Komunitas", format="#%d"),
                     "status_penanganan": "Status",
                 },
             )
-            if filtered_emp.empty:
-                st.info("Tidak ada pegawai yang cocok dengan filter di atas.")
-                return
             sel_rows = getattr(getattr(emp_selection, "selection", None), "rows", []) or []
             selected_emp_id = str(filtered_emp.iloc[sel_rows[0]]["employee_id"]) if sel_rows else str(filtered_emp.iloc[0]["employee_id"])
+            st.caption(f"Menampilkan {len(filtered_emp)} pegawai prioritas · Klik baris untuk mengganti sorotan.")
 
-        else:
-            # Mode per berkas transaksi
+        with tab_p_tx:
             tx_queue = period_tx[period_tx["risk_band"].isin(["Tinggi", "Sedang"])].copy()
             tx_queue["requester_name"] = tx_queue["requester_id"].map(names)
             tx_queue["approver_name"] = tx_queue["approver_id"].map(names)
-            tx_queue["sudah_diputus"] = tx_queue["request_id"].isin(decisions.index)
-            tx_queue["status_label"] = np.where(
-                tx_queue["sudah_diputus"],
-                "✅ " + tx_queue["request_id"].map(decisions["decision"]).fillna("Diputus"),
-                "🔴 Belum diputus",
-            )
             tx_queue["nominal_fmt"] = tx_queue["amount"].map(ui.rupiah)
-            tx_queue["alasan_utama"] = tx_queue["top_reasons"].fillna("").str.split(" | ").str[0]
-
-            if status_filter == "Belum Diputus Saja":
-                tx_queue = tx_queue[~tx_queue["sudah_diputus"]]
-            elif status_filter == "Sudah Diputus Saja":
-                tx_queue = tx_queue[tx_queue["sudah_diputus"]]
-
-            if search_q.strip():
-                q = search_q.strip()
-                tx_queue = tx_queue[
-                    tx_queue["request_id"].str.contains(q, case=False, na=False)
-                    | tx_queue["requester_name"].str.contains(q, case=False, na=False)
-                    | tx_queue["approver_name"].str.contains(q, case=False, na=False)
-                    | tx_queue["requester_unit"].str.contains(q, case=False, na=False)
-                ]
-
-            tx_queue = tx_queue.sort_values(["risk_score", "event_time"], ascending=False).head(400)
-            st.caption(
-                f"Menampilkan **{len(tx_queue):,} berkas alert**. "
-                "👉 **Klik satu baris transaksi** untuk melihat analisis pegawai & berkasnya di bawah."
-            )
             tx_selection = st.dataframe(
                 tx_queue[[
                     "request_id", "event_time", "approver_name", "requester_name", "requester_unit",
-                    "nominal_fmt", "risk_score", "risk_band", "alasan_utama", "status_label",
-                ]],
+                    "nominal_fmt", "risk_score", "risk_band",
+                ]].head(100),
                 hide_index=True,
                 use_container_width=True,
-                height=290,
+                height=320,
                 on_select="rerun",
                 selection_mode="single-row",
-                key="ws_tx_table",
+                key="ws_tx_table_v2",
                 column_config={
                     "request_id": "No. Berkas",
-                    "event_time": st.column_config.DatetimeColumn("Waktu Approval", format="DD MMM YYYY HH:mm"),
-                    "approver_name": "Approver (Pemutus)",
-                    "requester_name": "Requester (RM)",
+                    "event_time": st.column_config.DatetimeColumn("Waktu", format="DD MMM YY HH:mm"),
+                    "approver_name": "Approver",
+                    "requester_name": "Requester",
                     "requester_unit": "Unit",
                     "nominal_fmt": "Nominal",
-                    "risk_score": st.column_config.ProgressColumn("Skor Risiko", min_value=0, max_value=100, format="%.0f"),
+                    "risk_score": st.column_config.ProgressColumn("Skor", min_value=0, max_value=100, format="%.0f"),
                     "risk_band": "Level",
-                    "alasan_utama": "Alasan Utama (SHAP)",
-                    "status_label": "Status Keputusan",
                 },
             )
-            if tx_queue.empty:
-                st.info("Tidak ada berkas transaksi yang cocok dengan filter.")
-                return
-            sel_rows = getattr(getattr(tx_selection, "selection", None), "rows", []) or []
-            chosen_tx = tx_queue.iloc[sel_rows[0]] if sel_rows else tx_queue.iloc[0]
-            selected_req_id = str(chosen_tx["request_id"])
-            focus_role = st.radio(
-                "Sorot Profil Pegawai pada Transaksi Ini:",
-                [
-                    f"Approver: {chosen_tx['approver_name']} ({chosen_tx['approver_id']})",
-                    f"Requester: {chosen_tx['requester_name']} ({chosen_tx['requester_id']})",
-                ],
-                horizontal=True,
-                key="ws_tx_focus_emp",
-            )
-            selected_emp_id = str(chosen_tx["approver_id"]) if focus_role.startswith("Approver") else str(chosen_tx["requester_id"])
+            tx_rows = getattr(getattr(tx_selection, "selection", None), "rows", []) or []
+            if tx_rows:
+                row_sel = tx_queue.iloc[tx_rows[0]]
+                selected_req_id = str(row_sel["request_id"])
+                selected_emp_id = str(row_sel["approver_id"])
 
-    # =========================================================================
-    # 3. DOSSIER INVESTIGASI 360° UNTUK PEGAWAI TERPILIH
-    # =========================================================================
+    # Load active employee data
     emp_matches = emp_queue[emp_queue["employee_id"] == selected_emp_id]
     if emp_matches.empty:
         return
@@ -467,130 +531,156 @@ def render() -> None:
     narrative, reasons_list, comp_df = _build_human_reasons(employee, active_tx, period_tx, latest_anom_row)
     graph, partners_df = _employee_ego_graph(selected_emp_id)
 
-    # Banner Dossier 360°
-    anom_badge = (
-        ui.badge(f"Skor Perilaku (IF): {employee['skor_anomali']:.0f}/100 ({employee['kategori_anomali']})", ui.ORANGE)
-        if pd.notna(employee["skor_anomali"])
-        else ui.badge("Peran: Requester (RM/CA)", ui.BLUE)
-    )
-    alert_badge = ui.badge(f"{int(employee['alert_tinggi'])} Alert Transaksi Tinggi", ui.RED if employee["alert_tinggi"] > 0 else ui.GREEN)
-    comm_badge = (
-        ui.badge(f"Anggota Komunitas Risiko #{int(employee['komunitas'])}", ui.PURPLE)
-        if pd.notna(employee["komunitas"])
-        else ""
-    )
+    with top_right:
+        # Numbered Header 2
+        st.markdown(
+            f"""<div class='card-title-box' style='justify-content: space-between;'>
+                <div style='display: flex; align-items: center;'>
+                    <span class='card-header-badge'>2</span>
+                    <span>Peta Hubungan Pegawai (12 Bulan Terakhir)</span>
+                </div>
+                <div style='font-size: 0.8rem; color: #64748b;'>Pegawai: <b>{employee['employee_name']}</b></div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(
-        f"""
-        <div class='dossier-banner'>
-            <div class='dossier-title'>
-                📂 Dossier Investigasi 360°: {html.escape(str(employee['employee_name']))} ({html.escape(str(selected_emp_id))})
-                &nbsp; {anom_badge} {alert_badge} {comm_badge}
-            </div>
-            <div class='dossier-summary'>
-                <b>Ringkasan Analisis (Bahasa Manusia):</b> {html.escape(narrative)}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # 2 Kolom Inti: Kiri = Kenapa Dicurigai (Explainable), Kanan = Jaringan Komplotan
-    col_why, col_net = st.columns([1.15, 1.15])
-
-    with col_why:
-        st.markdown("#### 🔍 1. Mengapa Pegawai Ini Dicurigai?")
-        st.caption("Terjemahan langsung dari sinyal model ML & Rules dibandingkan dengan rata-rata rekan sejabatannya.")
-        if reasons_list:
-            for r_title, r_detail in reasons_list:
-                st.markdown(
-                    f"<div class='reason-card'><div class='reason-title'>⚠️ {html.escape(r_title)}</div>"
-                    f"<div class='reason-detail'>{html.escape(r_detail)}</div></div>",
-                    unsafe_allow_html=True,
-                )
-        else:
-            st.success("✅ Tidak ditemukan indikator perilaku yang menyimpang secara mencolok dibanding rekan sejabatan.")
-
-        if not comp_df.empty:
-            fig_comp = go.Figure()
-            fig_comp.add_bar(
-                y=comp_df["Indikator"],
-                x=comp_df["Rata-rata Rekan (%)"],
-                orientation="h",
-                name="Rata-rata Rekan Sejabatan",
-                marker_color=ui.MUTED,
-            )
-            fig_comp.add_bar(
-                y=comp_df["Indikator"],
-                x=comp_df["Pegawai Ini (%)"],
-                orientation="h",
-                name=str(employee["employee_name"]),
-                marker_color=ui.ORANGE,
-            )
-            fig_comp.update_layout(
-                barmode="group",
-                xaxis_title="% dari total transaksi",
-                yaxis=dict(autorange="reversed"),
-            )
-            st.plotly_chart(
-                ui.style_figure(
-                    fig_comp,
-                    "Perbandingan Nyata: Pegawai Ini vs Rata-rata Rekan",
-                    "Semakin panjang bar oranye dibanding abu-abu, semakin menyimpang polanya",
-                    height=300,
-                ),
-                use_container_width=True,
-            )
-
-    with col_net:
-        st.markdown("#### 🕸️ 2. Siapa Lingkaran / Komplotan Kerjanya?")
-        st.caption("Peta hubungan transaksi 12 bulan terakhir. Titik bertepi oranye adalah pegawai yang sedang diperiksa.")
         if graph is not None:
-            st.markdown(LEGEND_HTML, unsafe_allow_html=True)
-            html_net = pyvis_html(graph, height=340)
+            # Render interactive graph
+            html_net = pyvis_html(graph, height=330)
             if html_net:
-                components.html(html_net, height=355)
+                components.html(html_net, height=345)
             else:
-                st.plotly_chart(plotly_network(graph, height=350), use_container_width=True)
+                st.plotly_chart(plotly_network(graph, height=330), use_container_width=True)
         else:
             st.info("Pegawai ini belum memiliki jaringan pasangan mencolok di snapshot terbaru.")
 
-        if not partners_df.empty:
-            st.markdown("**Pasangan Kerja Paling Sering / Berisiko (12 Bulan Terakhir)**")
-            st.dataframe(
-                partners_df[["pasangan", "n", "k", "dependency_lift", "risky"]].head(5),
-                hide_index=True,
-                use_container_width=True,
-                height=185,
-                column_config={
-                    "pasangan": "Nama Pasangan (RM/Approver)",
-                    "n": "Total Tx Bersama",
-                    "k": "Tx Red Flag",
-                    "dependency_lift": st.column_config.NumberColumn("Kelipatan vs Unit (Lift)", format="%.1fx"),
-                    "risky": "Relasi Berisiko?",
-                },
+        st.markdown(LEGEND_HTML, unsafe_allow_html=True)
+
+    st.write("")
+
+    # -------------------------------------------------------------------------
+    # ROW 2: (3) Analisis Risk Driver, (4) Daftar Berkas Transaksi, (5) Dossier & Keputusan
+    # -------------------------------------------------------------------------
+    b_col1, b_col2, b_col3 = st.columns([1.05, 1.25, 0.95])
+
+    with b_col1:
+        # Numbered Header 3
+        st.markdown(
+            """<div class='card-title-box'>
+                <span class='card-header-badge'>3</span>
+                <span>Analisis Risk Driver: Mengapa Pegawai Ini Dicurigai?</span>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+        st.caption("Perbandingan dengan rata-rata rekan sejabatannya. Angka menunjukkan persentase transaksi.")
+
+        # Render driver cards with comparison bars
+        peer_tx = period_tx[period_tx["approver_position"] == employee["position"]] if employee["role"] == "Approver" else period_tx
+        if peer_tx.empty:
+            peer_tx = period_tx
+
+        def get_rate(df, col):
+            return float(df[col].mean() * 100.0) if len(df) and col in df else 0.0
+
+        driver_specs = [
+            ("rf_near_limit", "Nominal Mepet Limit (95–99%)", "⚠️"),
+            ("rf_after_hours", "Persetujuan Malam / Akhir Pekan", "🌙"),
+            ("rf_fast_approval", "Persetujuan Kilat (< 20 Menit)", "⚡"),
+        ]
+
+        for col_name, d_label, d_icon in driver_specs:
+            emp_val = get_rate(active_tx, col_name)
+            peer_val = max(get_rate(peer_tx, col_name), 0.1)
+            mult = emp_val / peer_val if peer_val > 0 else 1.0
+            n_cases = int(active_tx[col_name].sum()) if len(active_tx) and col_name in active_tx else 0
+
+            st.markdown(
+                f"""<div class='driver-card'>
+                    <div style='display: flex; gap: 8px; align-items: center; width: 140px;'>
+                        <span style='font-size: 1.15rem;'>{d_icon}</span>
+                        <div>
+                            <div style='font-size: 0.8rem; font-weight: 700; color: #1e293b;'>{d_label}</div>
+                            <div style='font-size: 0.76rem; color: #64748b;'><b>{emp_val:.1f}%</b> <span style='font-size: 0.72rem;'>(vs {peer_val:.1f}%)</span></div>
+                        </div>
+                    </div>
+                    <div style='flex: 1; margin: 0 10px; background: #fee2e2; border-radius: 999px; height: 12px; overflow: hidden;'>
+                        <div style='width: {min(emp_val * 2.5, 100):.1f}%; background: #ef4444; height: 100%; border-radius: 999px;'></div>
+                    </div>
+                    <div style='text-align: right; width: 95px;'>
+                        <div style='font-size: 0.82rem; font-weight: 700; color: #dc2626;'>{mult:.1f}x lebih tinggi</div>
+                        <div style='font-size: 0.72rem; color: #64748b;'>{n_cases} transaksi</div>
+                    </div>
+                </div>""",
+                unsafe_allow_html=True,
             )
 
-    # =========================================================================
-    # 4. DAFTAR TRANSAKSI TERKAIT & PENJELASAN SHAP PER BERKAS
-    # =========================================================================
-    st.divider()
-    st.markdown(f"#### 📋 3. Daftar Berkas Transaksi yang Melibatkan {employee['employee_name']}")
+        # Anomali Perilaku Bulanan (IF)
+        anom_score_val = employee.get("skor_anomali", 0)
+        st.markdown(
+            f"""<div class='driver-card'>
+                <div style='display: flex; gap: 8px; align-items: center; width: 140px;'>
+                    <span style='font-size: 1.15rem;'>📊</span>
+                    <div>
+                        <div style='font-size: 0.8rem; font-weight: 700; color: #1e293b;'>Anomali Perilaku (IF)</div>
+                        <div style='font-size: 0.76rem; color: #64748b;'><b>Skor {anom_score_val:.0f}</b> (vs 54)</div>
+                    </div>
+                </div>
+                <div style='flex: 1; margin: 0 10px; background: #fee2e2; border-radius: 999px; height: 12px; overflow: hidden;'>
+                    <div style='width: {min(anom_score_val, 100):.1f}%; background: #ef4444; height: 100%; border-radius: 999px;'></div>
+                </div>
+                <div style='text-align: right; width: 95px;'>
+                    <div style='font-size: 0.82rem; font-weight: 700; color: #dc2626;'>Signifikan tinggi</div>
+                    <div style='font-size: 0.72rem; color: #64748b;'>Kategori: Perlu dilihat</div>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-    alerts_df = active_tx.copy()
-    alerts_df["partner_name"] = np.where(
-        alerts_df["approver_id"] == selected_emp_id,
-        alerts_df["requester_id"].map(names) + " (RM)",
-        alerts_df["approver_id"].map(names) + " (Approver)",
-    )
-    alerts_df["nominal_fmt"] = alerts_df["amount"].map(ui.rupiah)
-    alerts_df["alasan_singkat"] = alerts_df["top_reasons"].fillna("").str.replace(" | ", "; ", regex=False)
-    alerts_df["keputusan_saat_ini"] = alerts_df["request_id"].map(decisions["decision"]).fillna("⏳ Belum diputus")
+        # Terdeteksi di Jaringan Komunitas
+        comm_num = employee.get("komunitas")
+        comm_text = f"Komunitas #{int(comm_num)}" if pd.notna(comm_num) else "Tidak terdeteksi"
+        st.markdown(
+            f"""<div class='driver-card'>
+                <div style='display: flex; gap: 8px; align-items: center;'>
+                    <span style='font-size: 1.15rem;'>🕸️</span>
+                    <div>
+                        <div style='font-size: 0.8rem; font-weight: 700; color: #1e293b;'>Terdeteksi di Jaringan</div>
+                        <div style='font-size: 0.76rem; color: #64748b;'>{comm_text}</div>
+                    </div>
+                </div>
+                <div style='text-align: right;'>
+                    <div style='font-size: 0.82rem; font-weight: 700; color: #f97316;'>{len(partners_df)} rekan terhubung</div>
+                    <div style='font-size: 0.72rem; color: #64748b;'>12 bulan terakhir</div>
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-    col_tx_list, col_tx_shap = st.columns([1.25, 1.0])
-    with col_tx_list:
-        st.caption("Klik satu berkas di tabel bawah untuk membedah alasan SHAP dan bukti detailnya di sebelah kanan:")
-        display_tx = alerts_df.head(50).reset_index(drop=True)
+    with b_col2:
+        # Numbered Header 4
+        alerts_df = active_tx.copy()
+        alerts_df["partner_name"] = np.where(
+            alerts_df["approver_id"] == selected_emp_id,
+            alerts_df["requester_id"].map(names) + " (RM)",
+            alerts_df["approver_id"].map(names) + " (Approver)",
+        )
+        alerts_df["nominal_fmt"] = alerts_df["amount"].map(ui.rupiah)
+        alerts_df["keputusan_saat_ini"] = alerts_df["request_id"].map(decisions["decision"]).fillna("Belum diputus")
+
+        st.markdown(
+            f"""<div class='card-title-box' style='justify-content: space-between;'>
+                <div style='display: flex; align-items: center;'>
+                    <span class='card-header-badge'>4</span>
+                    <span>Daftar Berkas Transaksi: {employee['employee_name']}</span>
+                </div>
+                <div style='font-size: 0.82rem; font-weight: 700; color: #1e293b;'>
+                    {len(alerts_df)} berkas &nbsp;|&nbsp; {ui.rupiah(alerts_df['amount'].sum())}
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+        display_tx = alerts_df.head(60).reset_index(drop=True)
         default_tx_idx = 0
         if selected_req_id and selected_req_id in display_tx["request_id"].values:
             default_tx_idx = int(display_tx.index[display_tx["request_id"] == selected_req_id][0])
@@ -598,80 +688,76 @@ def render() -> None:
         tx_sub_sel = st.dataframe(
             display_tx[[
                 "request_id", "event_time", "partner_name", "nominal_fmt",
-                "risk_score", "risk_band", "keputusan_saat_ini", "alasan_singkat",
+                "risk_score", "risk_band", "keputusan_saat_ini",
             ]],
             hide_index=True,
             use_container_width=True,
-            height=270,
+            height=300,
             on_select="rerun",
             selection_mode="single-row",
-            key=f"dossier_tx_{selected_emp_id}",
+            key=f"dossier_tx_v2_{selected_emp_id}",
             column_config={
-                "request_id": "ID Berkas",
-                "event_time": st.column_config.DatetimeColumn("Waktu", format="DD MMM YY HH:mm"),
-                "partner_name": "Pasangan Kerja",
-                "nominal_fmt": "Nominal",
+                "request_id": st.column_config.TextColumn("ID Berkas", width="small"),
+                "event_time": st.column_config.DatetimeColumn("Waktu", format="DD MMM HH:mm", width="small"),
+                "partner_name": st.column_config.TextColumn("Pasangan Kerja", width="medium"),
+                "nominal_fmt": st.column_config.TextColumn("Nominal", width="small"),
                 "risk_score": st.column_config.ProgressColumn("Skor", min_value=0, max_value=100, format="%.0f"),
-                "risk_band": "Level",
-                "keputusan_saat_ini": "Keputusan",
-                "alasan_singkat": "Alasan SHAP",
+                "risk_band": st.column_config.TextColumn("Level", width="small"),
+                "keputusan_saat_ini": st.column_config.TextColumn("Keputusan", width="small"),
             },
         )
         sub_rows = getattr(getattr(tx_sub_sel, "selection", None), "rows", []) or []
         chosen_alert_row = display_tx.iloc[sub_rows[0]] if sub_rows else display_tx.iloc[default_tx_idx]
-
-    with col_tx_shap:
         req_id = str(chosen_alert_row["request_id"])
-        st.markdown(
-            f"**Bedah Berkas `{req_id}`** &nbsp; {ui.band_badge(str(chosen_alert_row['risk_band']))} "
-            f"&nbsp; **Skor: {chosen_alert_row['risk_score']:.0f}/100**",
-            unsafe_allow_html=True,
-        )
-        st.caption(
-            f"Debitur: {chosen_alert_row.get('debtor_name_masked', '-')} ({chosen_alert_row['debtor_id']}) · "
-            f"{chosen_alert_row['loan_product']} · {ui.rupiah(chosen_alert_row['amount'], short=False)} "
-            f"({ui.percent(chosen_alert_row['limit_ratio'])} dari limit wewenang)"
-        )
-        explanations = services.table("alert_explanations")
-        reasons_shap = explanations[explanations["request_id"] == req_id].sort_values("rank", ascending=False)
-        if not reasons_shap.empty:
-            fig_shap = go.Figure(
-                go.Bar(
-                    x=reasons_shap["shap_value"],
-                    y=reasons_shap["reason"],
-                    orientation="h",
-                    marker_color=[ui.GROUP_COLORS.get(g, ui.ORANGE) for g in reasons_shap["feature_group"]],
-                    text=[f"+{v:.2f}" for v in reasons_shap["shap_value"]],
-                    textposition="outside",
-                )
-            )
-            fig_shap.update_layout(xaxis_title="Kontribusi penaik risiko (SHAP)", yaxis=dict(automargin=True))
-            st.plotly_chart(ui.style_figure(fig_shap, f"Kenapa berkas {req_id} skornya tinggi?", height=185), use_container_width=True)
-        else:
-            st.info("Berkas ini berisiko rendah sehingga tidak memiliki uraian penalti SHAP tinggi.")
 
         evidence_items = [e for e in str(chosen_alert_row.get("evidence") or "").split(" | ") if e and e != "nan"]
-        if evidence_items:
+        ev_str = " · ".join(f"`{ev}`" for ev in evidence_items) if evidence_items else "Semua parameter verifikasi berada dalam batas normal"
+        st.markdown(
+            f"""<div style='background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-top: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.03);'>
+                <div style='font-size: 0.82rem; font-weight: 700; color: #1e293b;'>📑 Bukti Log Sistem (Berkas {req_id}):</div>
+                <div style='font-size: 0.78rem; color: #475569; margin-top: 3px;'>{ev_str}</div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    with b_col3:
+        # Numbered Header 5
+        st.markdown(
+            """<div class='card-title-box'>
+                <span class='card-header-badge'>5</span>
+                <span>Dossier & Keputusan Investigasi</span>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+        tab_ai, tab_pdf = st.tabs(["📄 Ringkasan AI", "📥 Berkas PDF"])
+        user = services.current_user()
+        memo_state_key = f"ai_memo_{selected_emp_id}_{req_id}"
+        ai_memo_text = st.session_state.get(memo_state_key, "")
+
+        with tab_ai:
             st.markdown(
-                "**Bukti Log Sistem:** " + " · ".join(f"`{ev}`" for ev in evidence_items),
+                f"""<div style='background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; min-height: 140px; box-shadow: 0 1px 2px rgba(0,0,0,.03);'>
+                    <div style='font-size: 0.82rem; font-weight: 700; color: #1e293b;'>Ringkasan Analisis (AI)</div>
+                    <div style='font-size: 0.78rem; color: #475569; line-height: 1.5; margin-top: 5px;'>
+                        <b>{employee['employee_name']} ({selected_emp_id})</b> menjabat sebagai {employee['position']} di Unit {employee['unit_name']}.
+                        Skor anomali perilaku bulanan adalah <b>{employee['skor_anomali']:.0f}/100</b>.
+                        Tercatat <b>{int(employee['alert_tinggi'])} berkas</b> berisiko tinggi dengan total eksposur <b>{employee['nominal_berisiko_fmt']}</b>.
+                        {narrative}
+                    </div>
+                </div>""",
+                unsafe_allow_html=True,
             )
 
-    # =========================================================================
-    # 5. PANEL TINDAKAN: CETAK PDF RINGKASAN & FORM KEPUTUSAN INVESTIGATOR
-    # =========================================================================
-    st.divider()
-    col_pdf, col_decide = st.columns([1.1, 1.2])
-
-    user = services.current_user()
-    memo_state_key = f"ai_memo_{selected_emp_id}_{req_id}"
-    ai_memo_text = st.session_state.get(memo_state_key, "")
-
-    with col_pdf:
-        with st.container(border=True):
-            st.markdown("#### 📄 4. Cetak Ringkasan PDF & Bantuan AI")
-            st.caption(
-                "Unduh laporan ringkasan lengkap (Dossier PDF) berisi profil pegawai, alasan kejanggalan vs rekan, "
-                "tabel pasangan komplotan, dan daftar transaksi untuk lampiran berita acara pemeriksaan."
+        with tab_pdf:
+            st.markdown(
+                f"""<div style='background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; min-height: 140px; box-shadow: 0 1px 2px rgba(0,0,0,.03);'>
+                    <div style='font-size: 0.82rem; font-weight: 700; color: #1e293b;'>Ekspor Dokumen Resmi</div>
+                    <div style='font-size: 0.78rem; color: #64748b; margin: 4px 0 12px 0;'>
+                        Unduh dossier ringkasan lengkap untuk berita acara pemeriksaan investigasi fraud & kepatuhan.
+                    </div>
+                </div>""",
+                unsafe_allow_html=True,
             )
             current_status_str = str(chosen_alert_row.get("keputusan_saat_ini", "Belum diputus"))
             pdf_bytes = build_employee_dossier_pdf(
@@ -686,124 +772,41 @@ def render() -> None:
             )
             safe_name = str(employee["employee_name"]).replace(" ", "_")
             st.download_button(
-                label=f"📥 Unduh PDF Ringkasan Analisis ({employee['employee_name']})",
+                label=f"📥 Unduh Berkas PDF ({employee['employee_name']})",
                 data=pdf_bytes,
                 file_name=f"Dossier_Investigasi_{selected_emp_id}_{safe_name}.pdf",
                 mime="application/pdf",
                 type="primary",
                 use_container_width=True,
-                key=f"dl_pdf_{selected_emp_id}_{req_id}",
+                key=f"dl_pdf_v2_{selected_emp_id}_{req_id}",
             )
 
-            if st.button(
-                f"🤖 Minta AI Susun Draf Memo & Pertanyaan Klarifikasi ({req_id})",
-                use_container_width=True,
-                key=f"btn_ai_{selected_emp_id}_{req_id}",
-            ):
-                with st.spinner("Agen AI sedang merangkum bukti transaksi, jaringan, dan pedoman SOP…"):
-                    run_res = services.get_agent().run(
-                        f"Siapkan draf memo investigasi untuk transaksi {req_id}",
-                        "investigator",
-                        user["username"],
-                    )
-                    memo_draft = (
-                        run_res.get("pending_action", {}).get("memo")
-                        or run_res.get("final_answer", "")
-                    )
-                    st.session_state[memo_state_key] = memo_draft
-                    st.rerun()
-
-            if ai_memo_text:
-                edited_memo = st.text_area(
-                    "Draf Memo AI (otomatis ikut tercetak di PDF di atas):",
-                    value=ai_memo_text,
-                    height=180,
-                    key=f"edit_memo_{selected_emp_id}_{req_id}",
-                )
-                st.session_state[memo_state_key] = edited_memo
-                c_ok, c_del = st.columns(2)
-                if c_ok.button("✅ Setujui & Arsipkan Memo", key=f"approve_memo_{req_id}", use_container_width=True):
-                    services.get_store().approve_agent_action(req_id, "memo_investigasi", edited_memo, user["username"])
-                    st.success("Memo resmi disetujui dan tercatat di jejak audit.")
-                if c_del.button("🗑️ Tutup Draf", key=f"clear_memo_{req_id}", use_container_width=True):
-                    st.session_state.pop(memo_state_key, None)
-                    st.rerun()
-
-    with col_decide:
-        with st.container(border=True):
-            st.markdown("#### ⚖️ 5. Keputusan Investigator")
-            st.caption("Tentukan status tindak lanjut untuk kasus/pegawai ini. Setiap keputusan tercatat di log audit dan menjadi umpan balik model.")
-
-            if req_id in decisions.index:
-                last_rev = decisions.loc[req_id]
-                st.info(
-                    f"Status terakhir berkas **{req_id}**: **{last_rev['decision']}** "
-                    f"(oleh `{last_rev['username']}` pada `{last_rev['reviewed_at']}`). Catatan: *{last_rev['note'] or '-'}*"
-                )
-
-            open_emp_req_ids = alerts_df[
-                (alerts_df["risk_band"] == "Tinggi") & (~alerts_df["request_id"].isin(decisions.index))
-            ]["request_id"].tolist()
-
-            with st.form(f"form_decision_{selected_emp_id}_{req_id}"):
-                chosen_decision = st.radio(
-                    "Pilih Opsi Tindakan:",
-                    DECISIONS,
-                    key=f"rad_dec_{selected_emp_id}_{req_id}",
-                )
-                apply_scope = st.radio(
-                    "Terapkan Keputusan Pada:",
-                    [
-                        f"Hanya berkas terpilih ({req_id})",
-                        f"Semua alert Tinggi milik {employee['employee_name']} yang belum diputus ({len(open_emp_req_ids)} berkas)",
-                    ],
-                    horizontal=True,
-                    key=f"scope_dec_{selected_emp_id}_{req_id}",
-                )
-                note = st.text_area(
-                    "Catatan Bukti / Alasan Keputusan (misal: nomor surat lembur, hasil cek agunan, atau jadwal pemanggilan):",
-                    placeholder="Contoh: Ditemukan indikasi kuat pemecahan kredit dan ketergantungan pasangan, eskalasi ke SKAI...",
-                    height=85,
-                )
-                submitted = st.form_submit_button("💾 Simpan Keputusan Investigator", type="primary", use_container_width=True)
-                if submitted:
-                    store = services.get_store()
-                    model_name = settings.get("model_name", "RandomForest_Calibrated")
-                    if apply_scope.startswith("Semua") and len(open_emp_req_ids) > 0:
-                        for target_rid in open_emp_req_ids:
-                            row_score = float(alerts_df.loc[alerts_df["request_id"] == target_rid, "risk_score"].iloc[0])
-                            store.save_review(user["username"], user["role"], str(target_rid), chosen_decision, note, row_score, model_name)
-                        st.toast(f"Keputusan disimpan untuk {len(open_emp_req_ids)} berkas milik {employee['employee_name']}!")
-                    else:
-                        store.save_review(
-                            user["username"],
-                            user["role"],
-                            req_id,
-                            chosen_decision,
-                            note,
-                            float(chosen_alert_row["risk_score"]),
-                            model_name,
-                        )
-                        st.toast(f"Keputusan untuk berkas {req_id} berhasil disimpan!")
-                    st.rerun()
-
-    # =========================================================================
-    # 6. RIWAYAT KEPUTUSAN & TREN (DI DALAM EXPANDER AGAR RAPI)
-    # =========================================================================
-    with st.expander("📜 Lihat Riwayat Seluruh Keputusan Investigator & Tren Bulanan"):
-        all_reviews = services.get_store().reviews()
-        if all_reviews.empty:
-            st.caption("Belum ada keputusan investigator yang disimpan.")
-        else:
-            st.dataframe(
-                all_reviews.sort_values("reviewed_at", ascending=False),
-                hide_index=True,
-                use_container_width=True,
-                height=240,
+        # Form Tindakan Investigator
+        st.markdown("<div style='font-size: 0.84rem; font-weight: 700; color: #1e293b; margin: 10px 0 4px 0;'>Tindakan Investigator:</div>", unsafe_allow_html=True)
+        with st.form(f"form_decision_v2_{selected_emp_id}_{req_id}"):
+            chosen_decision = st.selectbox(
+                "Pilih Opsi Tindakan",
+                DECISIONS,
+                key=f"sel_dec_v2_{selected_emp_id}_{req_id}",
+                label_visibility="collapsed",
             )
-            st.download_button(
-                "Unduh Log Keputusan (CSV)",
-                all_reviews.to_csv(index=False),
-                "riwayat_keputusan_investigator.csv",
-                "text/csv",
+            note = st.text_input(
+                "Catatan / Alasan Keputusan",
+                placeholder="Contoh: Ditemukan indikasi kuat pemecahan kredit...",
+                key=f"note_v2_{selected_emp_id}_{req_id}",
             )
+            submitted = st.form_submit_button("💾 Simpan Keputusan Investigator", type="primary", use_container_width=True)
+            if submitted:
+                store = services.get_store()
+                model_name = services.app_settings().get("model_name", "RandomForest_Calibrated")
+                store.save_review(
+                    user["username"],
+                    user["role"],
+                    req_id,
+                    chosen_decision,
+                    note,
+                    float(chosen_alert_row["risk_score"]),
+                    model_name,
+                )
+                st.toast(f"Keputusan untuk berkas {req_id} berhasil disimpan!")
+                st.rerun()

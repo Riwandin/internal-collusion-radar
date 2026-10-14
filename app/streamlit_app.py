@@ -120,7 +120,7 @@ user = services.current_user()
 if user["role"] == "investigator":
     pages = {
         "Menu Investigator": [
-            page(inv_overview.render, "Meja Investigasi 360°", ":material/person_search:", "meja-investigasi", True),
+            page(inv_overview.render, "Overview", ":material/person_search:", "overview", True),
             page(network.render, "Peta Jaringan & Komplotan", ":material/hub:", "jaringan"),
             page(run_model.render, "Cek Berkas Baru (Live Test)", ":material/play_circle:", "live-test"),
             page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),
@@ -129,7 +129,7 @@ if user["role"] == "investigator":
 else:
     pages = {
         "Menu Manajemen": [
-            page(mgmt_overview.render, "Command Center & Peta Cabang", ":material/space_dashboard:", "command-center", True),
+            page(mgmt_overview.render, "Overview Monitoring", ":material/space_dashboard:", "overview-monitoring", True),
             page(impact.render, "Simulasi Dampak Bisnis & Kebijakan", ":material/payments:", "dampak-kebijakan"),
             page(mlops.render, "Kesehatan Sistem & Tata Kelola", ":material/verified_user:", "tata-kelola"),
             page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),

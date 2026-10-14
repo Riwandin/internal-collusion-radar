@@ -14,7 +14,7 @@ from .common import latest_decisions, red_flag_summary
 
 def render() -> None:
     ui.page_header(
-        "Command Center Eksekutif & Peta Cabang",
+        "Overview Monitoring",
         "Pantau eksposur rupiah berisiko, efektivitas model dibanding rules, konsentrasi risiko per cabang, dan progres tim investigator.",
     )
     settings = services.app_settings()
@@ -67,12 +67,12 @@ def render() -> None:
     prev_exp_high = prev_high["amount"].sum()
     delta_exp = ((exp_high - prev_exp_high) / max(prev_exp_high, 1) * 100) if prev_exp_high else 0
 
-    # Top KPI cards in Executive White Card Style
+    # Top KPI cards in Executive White Card Style with BNI Palette & Shocking Red for Critical Exposure
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(
-            f"""<div class='exec-card' style='border-top: 4px solid {ui.BLUE};'>
-                <div class='kpi-label'>Total Transaksi</div>
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.BNI_TEAL};'>
+                <div class='kpi-label' style='color: {ui.BNI_TEAL}; font-weight: 700;'>Total Transaksi</div>
                 <div class='kpi-value'>{tot_tx:,}</div>
                 <div class='kpi-sub' style='color: {"#16a34a" if delta_tot <= 0 else "#dc2626"}; font-weight: 600;'>
                     {'↓' if delta_tot <= 0 else '↑'} {abs(delta_tot):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
@@ -82,8 +82,8 @@ def render() -> None:
         )
     with k2:
         st.markdown(
-            f"""<div class='exec-card' style='border-top: 4px solid {ui.ORANGE};'>
-                <div class='kpi-label'>Transaksi Berisiko</div>
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.BNI_ORANGE};'>
+                <div class='kpi-label' style='color: {ui.BNI_ORANGE}; font-weight: 700;'>Transaksi Berisiko</div>
                 <div class='kpi-value'>{n_high:,} <span style='font-size: 1.05rem; font-weight: 500; color: {ui.INK_SECONDARY};'>({pct_high:.1f}%)</span></div>
                 <div class='kpi-sub' style='color: {"#dc2626" if delta_high > 0 else "#16a34a"}; font-weight: 600;'>
                     {'↑' if delta_high > 0 else '↓'} {abs(delta_high):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
@@ -93,8 +93,8 @@ def render() -> None:
         )
     with k3:
         st.markdown(
-            f"""<div class='exec-card' style='border-top: 4px solid {ui.PURPLE};'>
-                <div class='kpi-label'>Pegawai Berisiko</div>
+            f"""<div class='exec-card' style='border-top: 4px solid {ui.BNI_TEAL};'>
+                <div class='kpi-label' style='color: {ui.BNI_TEAL}; font-weight: 700;'>Pegawai Berisiko</div>
                 <div class='kpi-value'>{n_peg:,}</div>
                 <div class='kpi-sub' style='color: {"#dc2626" if delta_peg > 0 else "#16a34a"}; font-weight: 600;'>
                     {'↑' if delta_peg > 0 else '↓'} {abs(delta_peg):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
@@ -103,10 +103,11 @@ def render() -> None:
             unsafe_allow_html=True,
         )
     with k4:
+        # High Risk / Critical Potential Exposure: Shocking Red accent
         st.markdown(
-            f"""<div class='exec-card' style='border-top: 4px solid {ui.RED};'>
-                <div class='kpi-label'>Potensi Eksposur</div>
-                <div class='kpi-value'>{ui.rupiah(exp_high)}</div>
+            f"""<div class='exec-card' style='border-top: 4px solid #ef4444;'>
+                <div class='kpi-label' style='color: #ef4444; font-weight: 700;'>Potensi Eksposur (Kritis)</div>
+                <div class='kpi-value' style='color: #b91c1c;'>{ui.rupiah(exp_high)}</div>
                 <div class='kpi-sub' style='color: {"#dc2626" if delta_exp > 0 else "#16a34a"}; font-weight: 600;'>
                     {'↑' if delta_exp > 0 else '↓'} {abs(delta_exp):.1f}% <span style='font-weight: normal; color: {ui.MUTED};'>dari periode sebelumnya</span>
                 </div>
@@ -143,8 +144,8 @@ def render() -> None:
             fig_t.add_bar(
                 x=m_stats["label_bulan"],
                 y=m_stats["high"],
-                name="Transaksi Berisiko",
-                marker=dict(color="#f87171", line=dict(color="#ef4444", width=1)),
+                name="Transaksi Berisiko (Kritis)",
+                marker=dict(color="#ef4444", line=dict(color="#b91c1c", width=1)),
                 text=[f"{v:,}" for v in m_stats["high"]],
                 textposition="outside",
                 hovertemplate="<b>Bulan %{x}</b><br>Transaksi Berisiko: %{y:,}<extra></extra>",
@@ -155,8 +156,8 @@ def render() -> None:
                 name="Persentase terhadap total",
                 mode="lines+markers",
                 yaxis="y2",
-                line=dict(color="#3b82f6", width=3),
-                marker=dict(size=8, color="#2563eb", line=dict(color="white", width=2)),
+                line=dict(color=ui.BNI_TEAL, width=3),
+                marker=dict(size=8, color=ui.BNI_TEAL, line=dict(color="white", width=2)),
                 hovertemplate="<b>Bulan %{x}</b><br>Persentase: %{y:.1f}%<extra></extra>",
             )
             fig_t.update_layout(
@@ -176,9 +177,9 @@ def render() -> None:
                 """<div style='margin-bottom: 6px; font-weight: 700; font-size: 1.05rem;'>Distribusi Red Flag Transaksi</div>""",
                 unsafe_allow_html=True,
             )
-            # Red flag donut chart
+            # Red flag donut chart using BNI Palette + Shocking Red for top limit flag
             rf_data = [
-                ("Near Limit", int(high["rf_near_limit"].sum())),
+                ("Near Limit (Kritis)", int(high["rf_near_limit"].sum())),
                 ("After Hours", int(high["rf_after_hours"].sum())),
                 ("Fast Approval", int(high["rf_fast_approval"].sum())),
                 ("Repeat Debtor", int(high["rf_debtor_repeat"].sum())),
@@ -193,11 +194,11 @@ def render() -> None:
                 hole=0.55,
                 color="flag",
                 color_discrete_map={
-                    "Near Limit": "#ef4444",
-                    "After Hours": "#f97316",
-                    "Fast Approval": "#eab308",
-                    "Repeat Debtor": "#8b5cf6",
-                    "Pair Dependency": "#3b82f6",
+                    "Near Limit (Kritis)": "#ef4444",
+                    "After Hours": ui.BNI_ORANGE,
+                    "Fast Approval": "#f59e0b",
+                    "Repeat Debtor": ui.BNI_TEAL,
+                    "Pair Dependency": "#0284c7",
                 },
             )
             fig_donut.update_traces(
@@ -230,8 +231,8 @@ def render() -> None:
                 st.markdown(
                     f"""<div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;'>
                         <div style='width: 140px; font-weight: 600; font-size: 0.9rem; color: {ui.INK};'>{u_name}</div>
-                        <div style='flex: 1; margin: 0 16px; background: #fee2e2; border-radius: 999px; height: 16px; overflow: hidden;'>
-                            <div style='width: {min(u_pct * 3.5, 100):.1f}%; background: #ef4444; height: 100%; border-radius: 999px;'></div>
+                        <div style='flex: 1; margin: 0 16px; background: {ui.BNI_PEACH}; border-radius: 999px; height: 16px; overflow: hidden;'>
+                            <div style='width: {min(u_pct * 3.5, 100):.1f}%; background: {ui.BNI_ORANGE}; height: 100%; border-radius: 999px;'></div>
                         </div>
                         <div style='width: 60px; text-align: right; font-weight: 700; font-size: 0.92rem;'>{u_cnt:,}</div>
                         <div style='width: 65px; text-align: right; color: {ui.INK_SECONDARY}; font-size: 0.85rem;'>{u_pct:.0f}% total</div>
@@ -250,8 +251,8 @@ def render() -> None:
                 st.markdown(
                     f"""<div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;'>
                         <div style='width: 140px; font-weight: 600; font-size: 0.9rem; color: {ui.INK};'>{s_name}</div>
-                        <div style='flex: 1; margin: 0 16px; background: #fee2e2; border-radius: 999px; height: 16px; overflow: hidden;'>
-                            <div style='width: {min(s_pct * 1.8, 100):.1f}%; background: #ef4444; height: 100%; border-radius: 999px;'></div>
+                        <div style='flex: 1; margin: 0 16px; background: {ui.BNI_MINT}; border-radius: 999px; height: 16px; overflow: hidden;'>
+                            <div style='width: {min(s_pct * 1.8, 100):.1f}%; background: {ui.BNI_TEAL}; height: 100%; border-radius: 999px;'></div>
                         </div>
                         <div style='width: 60px; text-align: right; font-weight: 700; font-size: 0.92rem;'>{s_cnt:,}</div>
                         <div style='width: 65px; text-align: right; color: {ui.INK_SECONDARY}; font-size: 0.85rem;'>{s_pct:.0f}% total</div>
@@ -305,21 +306,21 @@ def render() -> None:
             )
             st.markdown(
                 f"""
-                <div class='exec-stat-box'>
+                <div class='exec-stat-box' style='border-left: 4px solid #ef4444;'>
                     <div style='font-size: 2rem;'>💰</div>
                     <div>
-                        <div style='font-size: 1.35rem; font-weight: 700; color: {ui.INK};'>{ui.rupiah(exp_high)}</div>
+                        <div style='font-size: 1.35rem; font-weight: 700; color: #b91c1c;'>{ui.rupiah(exp_high)}</div>
                         <div style='font-size: 0.83rem; color: {ui.INK_SECONDARY};'>Total potensi eksposur dari transaksi berisiko</div>
                     </div>
                 </div>
-                <div class='exec-stat-box'>
+                <div class='exec-stat-box' style='border-left: 4px solid {ui.BNI_ORANGE};'>
                     <div style='font-size: 2rem;'>📊</div>
                     <div>
                         <div style='font-size: 1.35rem; font-weight: 700; color: {ui.INK};'>{n_high:,}</div>
                         <div style='font-size: 0.83rem; color: {ui.INK_SECONDARY};'>Transaksi berisiko ({pct_high:.1f}% dari total)</div>
                     </div>
                 </div>
-                <div class='exec-stat-box'>
+                <div class='exec-stat-box' style='border-left: 4px solid {ui.BNI_TEAL};'>
                     <div style='font-size: 2rem;'>👥</div>
                     <div>
                         <div style='font-size: 1.35rem; font-weight: 700; color: {ui.INK};'>{n_peg:,}</div>
@@ -353,14 +354,14 @@ def render() -> None:
         reg_summary["alert_rate"] = reg_summary["alert"] / reg_summary["transaksi"].replace(0, np.nan)
         reg_top = reg_summary.dropna(subset=["alert_rate"]).sort_values("alert_rate").tail(8)
 
-        # Retained dark background horizontal bar chart from attached screenshot
+        # Regional bar chart matching white background theme with BNI color scale (teal to shocking red)
         fig_reg = px.bar(
             reg_top,
             x="alert_rate",
             y=grp_col,
             orientation="h",
             color="alert_rate",
-            color_continuous_scale=["#f3c3a3", "#e07a4a", "#ea580c"],
+            color_continuous_scale=[ui.BNI_MINT, ui.BNI_TEAL, ui.BNI_ORANGE, "#ef4444"],
             labels={"alert_rate": "% Transaksi Alert Tinggi", grp_col: ""},
         )
         fig_reg.update_layout(
@@ -368,19 +369,19 @@ def render() -> None:
             xaxis=dict(
                 title="% Transaksi Alert Tinggi",
                 tickformat=".1%",
-                gridcolor="#262626",
-                color="#ffffff",
-                zerolinecolor="#333333",
+                gridcolor="#f1f5f9",
+                color=ui.INK,
+                zerolinecolor="#e2e8f0",
             ),
-            yaxis=dict(color="#ffffff", gridcolor="#262626"),
-            paper_bgcolor="#14171a",
-            plot_bgcolor="#14171a",
-            font=dict(color="#ffffff"),
+            yaxis=dict(color=ui.INK, gridcolor="#f1f5f9"),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(color=ui.INK),
             margin=dict(l=10, r=20, t=50, b=20),
             height=380,
             title=dict(
-                text=f"<b>{chart_title}</b><br><span style='font-size:12px;color:#a0a0a0;'>{chart_sub}</span>",
-                font=dict(color="#ffffff", size=15),
+                text=f"<b>{chart_title}</b><br><span style='font-size:12px;color:{ui.INK_SECONDARY};'>{chart_sub}</span>",
+                font=dict(color=ui.INK, size=15),
                 x=0,
             ),
         )
@@ -504,7 +505,7 @@ def render() -> None:
             path=["region", "requester_unit"],
             values="transaksi",
             color="alert_rate",
-            color_continuous_scale=["#eef4fc", "#f3c35a", ui.ORANGE],
+            color_continuous_scale=[ui.BNI_MINT, ui.BNI_TEAL, ui.BNI_ORANGE, "#ef4444"],
             hover_data={"alert_tinggi": True, "skor_rata": ":.1f"},
         )
         figure.update_layout(coloraxis_colorbar=dict(title="% Alert", tickformat=".0%"))
@@ -524,7 +525,7 @@ def render() -> None:
             x="alert_rate",
             y="requester_unit",
             orientation="h",
-            color_discrete_sequence=[ui.ORANGE],
+            color_discrete_sequence=[ui.BNI_ORANGE],
             hover_data=["transaksi", "alert_tinggi", "region"],
             labels={"alert_rate": "% Alert Tinggi", "requester_unit": ""},
         )
@@ -542,10 +543,10 @@ def render() -> None:
         )
         unit_tx = transactions[(transactions["requester_unit"] == unit) & (transactions["event_time"].dt.year == year)]
         ui.kpi_row([
-            ("Total Transaksi Unit", ui.number(len(unit_tx)), unit, ui.BLUE),
-            ("Alert Tinggi", ui.number((unit_tx["risk_band"] == "Tinggi").sum()), ui.percent((unit_tx["risk_band"] == "Tinggi").mean(), 1), ui.ORANGE),
-            ("Nominal Berisiko", ui.rupiah(unit_tx.loc[unit_tx["risk_band"] == "Tinggi", "amount"].sum()), "Pada cabang ini", ui.RED),
-            ("Pejabat Pemutus Terlibat", ui.number(unit_tx.loc[unit_tx["risk_band"] == "Tinggi", "approver_id"].nunique()), "Approver unik", ui.PURPLE),
+            ("Total Transaksi Unit", ui.number(len(unit_tx)), unit, ui.BNI_TEAL),
+            ("Alert Tinggi", ui.number((unit_tx["risk_band"] == "Tinggi").sum()), ui.percent((unit_tx["risk_band"] == "Tinggi").mean(), 1), ui.BNI_ORANGE),
+            ("Nominal Berisiko", ui.rupiah(unit_tx.loc[unit_tx["risk_band"] == "Tinggi", "amount"].sum()), "Pada cabang ini", "#ef4444"),
+            ("Pejabat Pemutus Terlibat", ui.number(unit_tx.loc[unit_tx["risk_band"] == "Tinggi", "approver_id"].nunique()), "Approver unik", ui.BNI_TEAL),
         ])
         l_col, r_col = st.columns(2)
         monthly = (
@@ -553,12 +554,19 @@ def render() -> None:
             .apply(lambda s: (s == "Tinggi").mean())
             .reset_index()
         )
-        fig_m = px.line(monthly, x="event_time", y="risk_band", markers=True, labels={"event_time": "Bulan", "risk_band": "% Alert Tinggi"})
+        fig_m = px.line(
+            monthly,
+            x="event_time",
+            y="risk_band",
+            markers=True,
+            labels={"event_time": "Bulan", "risk_band": "% Alert Tinggi"},
+            color_discrete_sequence=[ui.BNI_TEAL],
+        )
         fig_m.update_layout(yaxis_tickformat=".0%")
         l_col.plotly_chart(ui.style_figure(fig_m, f"Tren % Alert Tinggi · Cabang {unit}", height=320), use_container_width=True)
 
         flags = red_flag_summary(unit_tx)
-        fig_f = px.bar(flags, x="% alert Tinggi", y="rule", orientation="h", color_discrete_sequence=[ui.ORANGE])
+        fig_f = px.bar(flags, x="% alert Tinggi", y="rule", orientation="h", color_discrete_sequence=[ui.BNI_ORANGE])
         fig_f.update_layout(xaxis_tickformat=".0%")
         r_col.plotly_chart(
             ui.style_figure(fig_f, f"Modus Pelanggaran Dominan di Cabang {unit}", "Membantu menentukan fokus audit cabang", height=320),
