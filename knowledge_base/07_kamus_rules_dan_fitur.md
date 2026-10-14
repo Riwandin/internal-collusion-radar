@@ -1,11 +1,11 @@
 ---
 doc_id: 07_kamus_rules_dan_fitur
-title: Kamus 5 rules, fitur graph, dan fitur Isolation Forest pada Collusion Radar
+title: Kamus 5 rules, fitur per pilar, dan fitur Isolation Forest pada Collusion Radar
 category: internal
-source: Notebook Internal Collusion Radar v9 (Bagian 1.8, 2.3, 2.4)
+source: Notebook Internal Collusion Radar v10 (Bagian 1.8, 2.3, 2.4, 2.5)
 url: internal://collusion-radar/kamus-fitur
-last_verified: 2026-10-11
-disclaimer: Definisi mengikuti konfigurasi notebook v9. Bila ambang diubah, dokumen ini harus diperbarui.
+last_verified: 2026-10-14
+disclaimer: Definisi mengikuti konfigurasi notebook v10. Bila ambang diubah, dokumen ini harus diperbarui.
 ---
 
 # Kamus rules dan fitur
@@ -22,7 +22,8 @@ Rules dihitung dari log transaksi tanpa memakai label. Ambangnya dikalibrasi sek
 | **R4 `rf_debtor_repeat`** | ≥ 2 pengajuan lain ke debitur yang sama dalam 1 tahun terakhir | 1×/tahun (perpanjangan, top-up) itu normal | perpanjangan tahunan |
 | **R5 `rf_pair_dependency`** | `requester_approver_ratio` ≥ 10%, minimal 5 pengajuan pasangan setahun, dan ≥ 5× porsi approver itu di unit requester | rasio mentah tidak membedakan karena RM memang bergantung pada manager unitnya | Plt/delegasi cuti (sesekali) |
 
-`rule_score` = jumlah rule yang terpenuhi (0–5). Rules dipakai sebagai **baseline** dan **alasan**, bukan skor akhir.
+`rule_score` = jumlah rule yang terpenuhi (0–5). Rules adalah **Pilar 1** Risk Engine (S_rule = 20 × rule_score), sekaligus
+baseline dan alasan yang dipahami auditor. Flag rules **tidak** dijadikan fitur model mana pun.
 
 ### Rumus indikator hubungan
 
@@ -31,9 +32,20 @@ Rules dihitung dari log transaksi tanpa memakai label. Ambangnya dikalibrasi sek
 - `unit_approver_share` = porsi approver tersebut di seluruh pengajuan unit requester (1 tahun).
 - `pair_dependency_lift` = `requester_approver_ratio` ÷ `unit_approver_share`. Lift 10× berarti requester memakai approver
   itu 10 kali lebih sering daripada kebiasaan rekan satu unitnya.
-- `pair_approval_rate` = pengajuan pasangan yang disetujui ÷ seluruh keputusan pasangan (fitur model, bukan rule).
+- `pair_approval_rate` = pengajuan pasangan yang disetujui ÷ seluruh keputusan pasangan (fitur Pilar 4, bukan rule).
 
-## Fitur graph per transaksi (input classifier)
+## Pembagian fitur ke pilar (v10)
+
+| Pilar | Kelompok | Fitur |
+|---|---|---|
+| 3 · Konten transaksi | Transaksi | `limit_ratio`, `approve_hour`, `approval_minutes`, `amount`, `tenor_months`, `bday_to_month_end`, produk, tujuan, sektor, tipe debitur, jabatan approver |
+| 3 · Konten transaksi | Riwayat debitur | `debtor_tenure_days`, `is_new_debtor`, `debtor_loans_30d`, `debtor_loans_1y` |
+| 4 · Relasi & jaringan | Relasi pasangan | `requester_prior_n`, `pair_prior_n`, `pair_share_of_approver`, `triad_prior_n`, `requester_approver_ratio`, `pair_dependency_lift`, `pair_approval_rate`, `routing_peer_share`, `same_unit` |
+| 4 · Relasi & jaringan | Graph | 10 fitur `g_*` (tabel di bawah) |
+
+Setiap fitur hanya masuk satu pilar sehingga sinyal yang sama tidak terhitung dua kali di skor akhir.
+
+## Fitur graph per transaksi (input Pilar 4)
 
 | Fitur | Arti |
 |---|---|
@@ -58,13 +70,17 @@ Requester yang berbagi debitur juga dihubungkan. Komunitas dicari dengan algorit
 | `ex_near_limit`, `ex_after_hours`, `ex_fast_approval`, `ex_debtor_repeat`, `ex_pair_dependency`, `ex_multi_flag` | kelebihan jumlah transaksi ber-rule dibanding rekan sejabatan (excess z-score, 90 hari) |
 | `approve_rate` | persentase pengajuan yang disetujui |
 | `top_requester_share` | porsi keputusan dari satu requester teratas |
-| `ga_risky_pairs`, `ga_max_pair_z`, `ga_shared_debtor_share`, `ga_comm_score`, `ga_comm_size`, `ga_risk_pagerank` | posisi approver di jaringan berisiko |
 
 Excess z-score = (jumlah teramati − jumlah wajar) ÷ simpangan baku binomial, dengan "wajar" dihitung dari rekan
 sejabatan. Contoh: rekan sejabatan rata-rata 4% near-limit; approver dengan 40 keputusan wajarnya punya 1,6 transaksi
 near-limit; bila ia punya 9, excess-nya sekitar +6 SD.
 
+Fitur graph per approver (`ga_risky_pairs`, `ga_max_pair_z`, `ga_shared_debtor_share`, `ga_comm_score`, `ga_comm_size`,
+`ga_risk_pagerank`) **tidak** dipakai Isolation Forest sejak v10 (posisi jaringan sudah ditangani Pilar 4); fitur ini hanya
+ditampilkan sebagai konteks di profil pegawai. Isolation Forest di-fit pada approver-bulan s.d. 2024.
+
 ## Yang sengaja tidak dijadikan fitur
 
 ID pegawai/debitur (model akan menghafal orang), nama unit dan wilayah (risiko bias), kolom `pattern` (kunci jawaban),
-data kinerja kredit (terjadi setelah approval), dan skor Isolation Forest (dijaga terpisah dari classifier).
+data kinerja kredit (terjadi setelah approval), flag rules (sudah menjadi Pilar 1), dan skor Isolation Forest (masuk ke
+penggabung sebagai Pilar 2, bukan fitur model konten/relasi).

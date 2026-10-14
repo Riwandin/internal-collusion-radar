@@ -1,13 +1,18 @@
 fitur,kelompok,PSI 2026 vs train,status
-requester_prior_n,Riwayat,1.8442116931354042,bergeser
-pair_prior_n,Riwayat,1.0429944851854538,bergeser
-g_appr_wdeg,Graph,0.7167743654781251,bergeser
-routing_peer_share,Riwayat,0.30781291555490403,bergeser
-debtor_tenure_days,Transaksi,0.19361823153499294,pantau
-g_pair_weight,Graph,0.13333739663812105,pantau
-g_debtor_n_requesters,Graph,0.09201665958390698,stabil
-pair_dependency_lift,Rules,0.004428775746874961,stabil
+debtor_tenure_days,Riwayat debitur,0.19361823153499294,pantau
+debtor_loans_1y,Riwayat debitur,0.08923511903241493,stabil
+g_appr_risk_pagerank,Graph,0.054682444184413176,stabil
+s_if,Skor pilar (vs validation 2025),0.05299377842307848,stabil
+s_graph,Skor pilar (vs validation 2025),0.00397197802142273,stabil
+s_cls,Skor pilar (vs validation 2025),0.0038250735579530076,stabil
+risk_score,Skor pilar (vs validation 2025),0.0018897824599847725,stabil
+bday_to_month_end,Transaksi,0.0016535539968990762,stabil
+s_rule,Skor pilar (vs validation 2025),0.0007993122494929748,stabil
 amount,Transaksi,0.0004702380923720814,stabil
 approve_hour,Transaksi,0.0004588285530503685,stabil
 limit_ratio,Transaksi,0.00027607149381698055,stabil
-rule_score,Rules,4.591990117863927e-05,stabil
+approval_minutes,Transaksi,0.00014533114955011972,stabil
+g_same_comm,Graph,0.0,stabil
+g_risk_pair_weight,Graph,0.0,stabil
+g_risk_pair_z,Graph,0.0,stabil
+debtor_loans_30d,Riwayat debitur,0.0,stabil

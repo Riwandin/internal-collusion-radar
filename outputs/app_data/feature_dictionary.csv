@@ -1,41 +1,41 @@
-fitur,kelompok,arti,tipe
-limit_ratio,Transaksi,nominal ÷ limit approver,numerik
-approve_hour,Transaksi,jam approval,numerik
-approval_minutes,Transaksi,menit dari pengajuan ke approval,numerik
-debtor_tenure_days,Transaksi,lama debitur jadi nasabah (hari),numerik
-is_new_debtor,Transaksi,debitur < 1 tahun jadi nasabah,numerik
-amount,Transaksi,nominal pengajuan,numerik
-tenor_months,Transaksi,tenor (bulan),numerik
-bday_to_month_end,Transaksi,sisa hari kerja sampai akhir bulan,numerik
-loan_product,Transaksi,Super Mikro / Mikro / Kecil,kategorikal → one-hot
-request_purpose,Transaksi,tujuan pinjaman,kategorikal → one-hot
-business_sector,Transaksi,sektor usaha debitur,kategorikal → one-hot
-debtor_type,Transaksi,Individual / SME,kategorikal → one-hot
-approver_position,Transaksi,jabatan approver,kategorikal → one-hot
-debtor_loans_30d,Riwayat,pengajuan lain ke debitur sama ≤ 30 hari,numerik
-debtor_loans_1y,Riwayat,pengajuan lain ke debitur sama ≤ 1 tahun,numerik
-routing_peer_share,Riwayat,% approval rekan unit oleh unit approver ini,numerik
-same_unit,Riwayat,requester & approver satu unit,numerik
-pair_prior_n,Riwayat,riwayat pasangan requester–approver,numerik
-pair_share_of_approver,Riwayat,% keputusan approver dari requester ini,numerik
-triad_prior_n,Riwayat,riwayat requester–approver–debitur,numerik
-requester_prior_n,Riwayat,riwayat pengajuan requester,numerik
-rf_near_limit,Rules,rule 1 near limit,numerik
-rf_after_hours,Rules,rule 2 luar jam kerja,numerik
-rf_fast_approval,Rules,rule 3 approval kilat,numerik
-rf_debtor_repeat,Rules,rule 4 debitur berulang,numerik
-rf_pair_dependency,Rules,rule 5 ketergantungan approver,numerik
-rule_score,Rules,jumlah rule terpenuhi (0–5),numerik
-requester_approver_ratio,Rules,pengajuan pasangan ÷ pengajuan requester (1 thn),numerik
-pair_dependency_lift,Rules,rasio pasangan ÷ porsi approver di unit requester,numerik
-pair_approval_rate,Rules,% pengajuan pasangan yang disetujui (1 thn),numerik
-g_pair_weight,Graph,frekuensi hubungan pasangan (12 bln),numerik
-g_appr_wdeg,Graph,total transaksi approver (12 bln),numerik
-g_debtor_n_requesters,Graph,requester berbeda yang melayani debitur ini,numerik
-g_req_shared_debtors,Graph,debitur requester yang dipakai bersama RM lain,numerik
-g_risk_pair_z,Graph,z red flag pasangan (0 = wajar),numerik
-g_risk_pair_weight,Graph,bobot hubungan di graph risiko,numerik
-g_risk_comm_score,Graph,skor komunitas risiko requester,numerik
-g_risk_comm_size,Graph,ukuran komunitas risiko requester,numerik
-g_same_comm,Graph,requester & approver satu komunitas risiko,numerik
-g_appr_risk_pagerank,Graph,sentralitas approver di jaringan berisiko,numerik
+fitur,pilar,kelompok,arti,tipe
+limit_ratio,Pilar 3 · Konten transaksi,Transaksi,nominal ÷ limit approver,numerik
+approve_hour,Pilar 3 · Konten transaksi,Transaksi,jam approval,numerik
+approval_minutes,Pilar 3 · Konten transaksi,Transaksi,menit dari pengajuan ke approval,numerik
+amount,Pilar 3 · Konten transaksi,Transaksi,nominal pengajuan,numerik
+tenor_months,Pilar 3 · Konten transaksi,Transaksi,tenor (bulan),numerik
+bday_to_month_end,Pilar 3 · Konten transaksi,Transaksi,sisa hari kerja sampai akhir bulan,numerik
+loan_product,Pilar 3 · Konten transaksi,Transaksi,Super Mikro / Mikro / Kecil,kategorikal → one-hot
+request_purpose,Pilar 3 · Konten transaksi,Transaksi,tujuan pinjaman,kategorikal → one-hot
+business_sector,Pilar 3 · Konten transaksi,Transaksi,sektor usaha debitur,kategorikal → one-hot
+debtor_type,Pilar 3 · Konten transaksi,Transaksi,Individual / SME,kategorikal → one-hot
+approver_position,Pilar 3 · Konten transaksi,Transaksi,jabatan approver,kategorikal → one-hot
+debtor_tenure_days,Pilar 3 · Konten transaksi,Riwayat debitur,lama debitur jadi nasabah (hari),numerik
+is_new_debtor,Pilar 3 · Konten transaksi,Riwayat debitur,debitur < 1 tahun jadi nasabah,numerik
+debtor_loans_30d,Pilar 3 · Konten transaksi,Riwayat debitur,pengajuan lain ke debitur sama ≤ 30 hari,numerik
+debtor_loans_1y,Pilar 3 · Konten transaksi,Riwayat debitur,pengajuan lain ke debitur sama ≤ 1 tahun,numerik
+rf_near_limit,Pilar 1 · Rules SOP,Rules,rule 1 near limit,numerik
+rf_after_hours,Pilar 1 · Rules SOP,Rules,rule 2 luar jam kerja,numerik
+rf_fast_approval,Pilar 1 · Rules SOP,Rules,rule 3 approval kilat,numerik
+rf_debtor_repeat,Pilar 1 · Rules SOP,Rules,rule 4 debitur berulang,numerik
+rf_pair_dependency,Pilar 1 · Rules SOP,Rules,rule 5 ketergantungan approver,numerik
+rule_score,Pilar 1 · Rules SOP,Rules,jumlah rule terpenuhi (0–5),numerik
+requester_prior_n,Pilar 4 · Relasi & jaringan,Relasi pasangan,riwayat pengajuan requester,numerik
+pair_prior_n,Pilar 4 · Relasi & jaringan,Relasi pasangan,riwayat pasangan requester–approver,numerik
+pair_share_of_approver,Pilar 4 · Relasi & jaringan,Relasi pasangan,% keputusan approver dari requester ini,numerik
+triad_prior_n,Pilar 4 · Relasi & jaringan,Relasi pasangan,riwayat requester–approver–debitur,numerik
+requester_approver_ratio,Pilar 4 · Relasi & jaringan,Relasi pasangan,pengajuan pasangan ÷ pengajuan requester (1 thn),numerik
+pair_dependency_lift,Pilar 4 · Relasi & jaringan,Relasi pasangan,rasio pasangan ÷ porsi approver di unit requester,numerik
+pair_approval_rate,Pilar 4 · Relasi & jaringan,Relasi pasangan,% pengajuan pasangan yang disetujui (1 thn),numerik
+routing_peer_share,Pilar 4 · Relasi & jaringan,Relasi pasangan,% approval rekan unit oleh unit approver ini,numerik
+same_unit,Pilar 4 · Relasi & jaringan,Relasi pasangan,requester & approver satu unit,numerik
+g_pair_weight,Pilar 4 · Relasi & jaringan,Graph,frekuensi hubungan pasangan (12 bln),numerik
+g_appr_wdeg,Pilar 4 · Relasi & jaringan,Graph,total transaksi approver (12 bln),numerik
+g_debtor_n_requesters,Pilar 4 · Relasi & jaringan,Graph,requester berbeda yang melayani debitur ini,numerik
+g_req_shared_debtors,Pilar 4 · Relasi & jaringan,Graph,debitur requester yang dipakai bersama RM lain,numerik
+g_risk_pair_z,Pilar 4 · Relasi & jaringan,Graph,z red flag pasangan (0 = wajar),numerik
+g_risk_pair_weight,Pilar 4 · Relasi & jaringan,Graph,bobot hubungan di graph risiko,numerik
+g_risk_comm_score,Pilar 4 · Relasi & jaringan,Graph,skor komunitas risiko requester,numerik
+g_risk_comm_size,Pilar 4 · Relasi & jaringan,Graph,ukuran komunitas risiko requester,numerik
+g_same_comm,Pilar 4 · Relasi & jaringan,Graph,requester & approver satu komunitas risiko,numerik
+g_appr_risk_pagerank,Pilar 4 · Relasi & jaringan,Graph,sentralitas approver di jaringan berisiko,numerik

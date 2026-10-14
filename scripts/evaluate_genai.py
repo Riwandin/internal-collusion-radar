@@ -27,7 +27,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--judge-model", default=SETTINGS.judge_model)
     args = parser.parse_args()
-    eval_set = [json.loads(line) for line in (SETTINGS.knowledge_base_dir / "eval" / "rag_eval_set.jsonl").read_text().splitlines() if line.strip()]
+    eval_set = [json.loads(line) for line in (SETTINGS.knowledge_base_dir / "eval" / "rag_eval_set.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     client = OllamaClient(SETTINGS.ollama_base_url, SETTINGS.llm_timeout_seconds)
     store = DataStore()
     retriever = load_or_build_retriever(SETTINGS.rag_index_dir, SETTINGS.knowledge_base_dir, SETTINGS.embedding_model)

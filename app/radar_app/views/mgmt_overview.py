@@ -35,7 +35,13 @@ def render() -> None:
     upper = (true_reviewed + reviewed_precision * (len(high) - len(reviewed))) / max(len(high), 1)
 
     impact = services.table("impact")
-    model_impact = impact[impact["skenario"].str.startswith("Model")].iloc[0] if len(impact) else None
+    model_rows = impact[impact["skenario"].str.startswith("Model")] if len(impact) else impact
+    model_impact = model_rows.iloc[0] if len(model_rows) else None
+    metrics = services.table("model_metrics")
+    test_metrics = metrics[metrics["periode"] == "test 2026"].set_index("model")
+    final_name = next((m for m in test_metrics.index if "Risk Engine" in m), None)
+    false_alarm_cut = (1 - test_metrics.loc[final_name, "FP"] / test_metrics.loc["Rules (rule_score)", "FP"]
+                       if final_name and "Rules (rule_score)" in test_metrics.index else None)
     decisions = latest_decisions()
     backlog = int((~high["request_id"].isin(decisions.index)).sum())
 
@@ -63,7 +69,7 @@ def render() -> None:
         left, right = st.columns([1.45, 1])
         figure = go.Figure()
         figure.add_bar(x=kpis["month"], y=kpis["rule_flagged"], name="Ditandai Rules (Banjir Alarm)", marker_color="#d8d7d2")
-        figure.add_bar(x=kpis["month"], y=kpis["alert_tinggi"], name="Alert Tinggi (Model ML)", marker_color=ui.ORANGE)
+        figure.add_bar(x=kpis["month"], y=kpis["alert_tinggi"], name="Alert Tinggi (Risk Engine)", marker_color=ui.ORANGE)
         figure.add_scatter(
             x=kpis["month"],
             y=kpis["kolusi_terkonfirmasi"],
@@ -77,7 +83,8 @@ def render() -> None:
         left.plotly_chart(
             ui.style_figure(
                 figure,
-                "Model ML Memangkas Alarm Palsu −81% Dibanding Rules",
+                (f"Risk Engine Memangkas Alarm Palsu −{false_alarm_cut:.0%} Dibanding Rules" if false_alarm_cut is not None
+                 else "Risk Engine vs Rules"),
                 "Perbandingan jumlah alert bulanan vs kasus kolusi nyata (2021–2026)",
             ),
             use_container_width=True,
@@ -120,15 +127,18 @@ def render() -> None:
                 },
             )
         with c2:
-            metrics = services.table("model_metrics")
-            test = metrics[metrics["periode"] == "test 2026"].set_index("model")
-            st.markdown("**🎯 Perbandingan Akurasi Model (Data Uji 2026)**")
+            st.markdown("**🎯 Akurasi di Data Uji 2026**")
+            display_test = test_metrics.loc[keep, ["precision", "recall", "PR-AUC", "FP"]].copy()
             st.dataframe(
-                test[["precision", "recall", "PR-AUC", "FP"]].style.format(
-                    {"precision": "{:.0%}", "recall": "{:.0%}", "PR-AUC": "{:.3f}"}
-                ),
+                display_test,
                 use_container_width=True,
+                column_config={
+                    "precision": st.column_config.NumberColumn("Precision", format="%.0f%%"),
+                    "recall": st.column_config.NumberColumn("Recall", format="%.0f%%"),
+                    "PR-AUC": st.column_config.NumberColumn("PR-AUC", format="%.3f"),
+                },
             )
+            st.caption("Detail perbandingan versi & bobot pilar: halaman Risk Engine 4 Pilar.")
         with c3:
             st.markdown("**💰 Ringkasan Dampak Finansial Tahunan**")
             if len(impact):
@@ -206,3 +216,16 @@ def render() -> None:
             ui.style_figure(fig_f, f"Modus Pelanggaran Dominan di Cabang {unit}", "Membantu menentukan fokus audit cabang", height=320),
             use_container_width=True,
         )
+        unit_alerts = unit_tx[unit_tx["risk_band"] != "Rendah"]
+        contribution_columns = [f"c_{p}" for p in ui.PILLARS]
+        if len(unit_alerts) and set(contribution_columns) <= set(unit_alerts.columns):
+            drivers = unit_alerts[contribution_columns].idxmax(axis=1).str[2:].map(ui.PILLAR_LABELS).value_counts(normalize=True)
+            fig_p = px.bar(x=drivers.values, y=drivers.index, orientation="h", color=drivers.index,
+                           color_discrete_map={ui.PILLAR_LABELS[p]: ui.PILLAR_COLORS[p] for p in ui.PILLARS}, labels={"x": "", "y": ""})
+            fig_p.update_layout(showlegend=False, xaxis_tickformat=".0%")
+            st.plotly_chart(
+                ui.style_figure(fig_p, f"Pilar Penyebab Utama Alert di Cabang {unit}",
+                                "konten transaksi → perketat verifikasi berkas · relasi → rotasi pasangan requester–approver",
+                                height=260),
+                use_container_width=True,
+            )

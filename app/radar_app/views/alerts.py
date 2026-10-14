@@ -10,7 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from ..ui import components as ui
-from ..ui import services
+from ..ui import pillars, services
 from ..ui.network import LEGEND_HTML, build_graph, plotly_network, pyvis_html
 from .common import DECISIONS, RED_FLAG_COLUMNS, flags_text, latest_decisions, show_guard_checks
 
@@ -61,13 +61,7 @@ def score_gauge(score: float, threshold: float) -> go.Figure:
 
 
 def shap_bar(explanations: pd.DataFrame) -> go.Figure:
-    frame = explanations.sort_values("rank", ascending=False)
-    figure = go.Figure(go.Bar(x=frame["shap_value"], y=frame["reason"], orientation="h",
-                              marker_color=[ui.GROUP_COLORS.get(g, ui.BLUE) for g in frame["feature_group"]],
-                              text=[f"+{v:.2f}" for v in frame["shap_value"]], textposition="outside",
-                              hovertext=frame["feature"] + " · kelompok " + frame["feature_group"]))
-    figure.update_layout(xaxis_title="kontribusi SHAP (menaikkan risiko)", yaxis=dict(automargin=True))
-    return ui.style_figure(figure, "Tiga alasan utama skor (SHAP)", "warna = kelompok fitur", height=260)
+    return pillars.reasons_chart(explanations, "Alasan utama skor (kontribusi per pilar)", height=260)
 
 
 def ego_network(row: pd.Series) -> nx.Graph | None:
@@ -105,7 +99,7 @@ def render_detail(row: pd.Series, settings: dict) -> None:
         if len(reasons):
             st.plotly_chart(shap_bar(reasons), use_container_width=True)
         else:
-            st.info("Alasan SHAP disimpan untuk alert Tinggi/Sedang.")
+            st.info("Alasan disimpan untuk alert Tinggi/Sedang.")
         flags = [ui.RED_FLAG_LABELS[c] for c in RED_FLAG_COLUMNS if row.get(c) == 1]
         st.markdown("**Red flag terpenuhi:** " + (ui.chips(flags) if flags else "tidak ada"), unsafe_allow_html=True)
     with column_c:

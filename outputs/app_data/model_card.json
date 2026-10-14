@@ -1,23 +1,137 @@
 {
-  "nama": "KUR Collusion Radar — Transaction Risk Model",
+  "nama": "KUR Collusion Radar — Multi-View Risk Engine (v10)",
   "versi_data": "synthetic v6.1 (seed 2026)",
-  "algoritma": "Random Forest",
-  "hyperparameter": {
-    "n_estimators": 300,
-    "max_depth": null,
-    "min_samples_leaf": 2,
-    "max_features": "sqrt"
+  "algoritma": "Stacking logistic regression di atas 4 pilar",
+  "pilar": {
+    "rule": {
+      "jenis": "5 rule SOP, deterministik",
+      "skor": "S_rule = 20 × jumlah rule",
+      "fitur": [
+        "rf_near_limit",
+        "rf_after_hours",
+        "rf_fast_approval",
+        "rf_debtor_repeat",
+        "rf_pair_dependency",
+        "rule_score"
+      ]
+    },
+    "iforest": {
+      "jenis": "Isolation Forest (tanpa label), fit approver-bulan s.d. 2024",
+      "fitur": [
+        "ex_near_limit",
+        "ex_after_hours",
+        "ex_fast_approval",
+        "ex_debtor_repeat",
+        "ex_pair_dependency",
+        "ex_multi_flag",
+        "approve_rate",
+        "top_requester_share"
+      ],
+      "hyperparameter": {
+        "n_estimators": 200,
+        "max_samples": 997,
+        "max_features": 0.8541861599520202
+      }
+    },
+    "classifier": {
+      "jenis": "LightGBM",
+      "fitur": [
+        "limit_ratio",
+        "approve_hour",
+        "approval_minutes",
+        "amount",
+        "tenor_months",
+        "bday_to_month_end",
+        "loan_product",
+        "request_purpose",
+        "business_sector",
+        "debtor_type",
+        "approver_position",
+        "debtor_tenure_days",
+        "is_new_debtor",
+        "debtor_loans_30d",
+        "debtor_loans_1y"
+      ],
+      "hyperparameter": {
+        "n_estimators": 450,
+        "num_leaves": 15,
+        "learning_rate": 0.020460557273112672,
+        "subsample": 0.9196922974320498,
+        "colsample_bytree": 0.9045423663538402,
+        "min_child_samples": 48,
+        "reg_lambda": 6.269393893843646
+      },
+      "imbalance": "class_weight",
+      "kalibrasi": "isotonic (validation 2025)"
+    },
+    "graph": {
+      "jenis": "Extra Trees",
+      "fitur": [
+        "requester_prior_n",
+        "pair_prior_n",
+        "pair_share_of_approver",
+        "triad_prior_n",
+        "requester_approver_ratio",
+        "pair_dependency_lift",
+        "pair_approval_rate",
+        "routing_peer_share",
+        "same_unit",
+        "g_pair_weight",
+        "g_appr_wdeg",
+        "g_debtor_n_requesters",
+        "g_req_shared_debtors",
+        "g_risk_pair_z",
+        "g_risk_pair_weight",
+        "g_risk_comm_score",
+        "g_risk_comm_size",
+        "g_same_comm",
+        "g_appr_risk_pagerank"
+      ],
+      "hyperparameter": {
+        "n_estimators": 300,
+        "max_depth": null,
+        "min_samples_leaf": 2,
+        "max_features": "sqrt"
+      },
+      "imbalance": "none",
+      "kalibrasi": "isotonic (validation 2025)"
+    }
   },
-  "imbalance": "none",
-  "kalibrasi": "isotonic (validation 2025)",
-  "threshold_tinggi": 0.4762,
-  "threshold_sedang": 0.2381,
+  "penggabung": {
+    "model": "Logistic regression monoton (koefisien pilar ≥ 0, C=1.0)",
+    "dilatih_di": "validation 2025",
+    "input": [
+      "logit_cls",
+      "logit_graph",
+      "rule_scaled",
+      "if_scaled",
+      "if_missing"
+    ],
+    "koefisien": {
+      "logit_cls": 0.941,
+      "logit_graph": 0.749,
+      "rule_scaled": 0.0,
+      "if_scaled": 1.978,
+      "if_missing": -0.339
+    },
+    "intercept": -1.1262,
+    "bobot_efektif": {
+      "rule": 0.0,
+      "iforest": 0.1613,
+      "classifier": 0.4946,
+      "graph": 0.3441
+    }
+  },
+  "threshold_tinggi": 0.3497,
+  "threshold_sedang": 0.1748,
+  "jaring_pengaman": {
+    "classifier": 0.556,
+    "graph": 0.8
+  },
   "fitur": [
     "limit_ratio",
     "approve_hour",
     "approval_minutes",
-    "debtor_tenure_days",
-    "is_new_debtor",
     "amount",
     "tenor_months",
     "bday_to_month_end",
@@ -26,23 +140,19 @@
     "business_sector",
     "debtor_type",
     "approver_position",
+    "debtor_tenure_days",
+    "is_new_debtor",
     "debtor_loans_30d",
     "debtor_loans_1y",
-    "routing_peer_share",
-    "same_unit",
+    "requester_prior_n",
     "pair_prior_n",
     "pair_share_of_approver",
     "triad_prior_n",
-    "requester_prior_n",
-    "rf_near_limit",
-    "rf_after_hours",
-    "rf_fast_approval",
-    "rf_debtor_repeat",
-    "rf_pair_dependency",
-    "rule_score",
     "requester_approver_ratio",
     "pair_dependency_lift",
     "pair_approval_rate",
+    "routing_peer_share",
+    "same_unit",
     "g_pair_weight",
     "g_appr_wdeg",
     "g_debtor_n_requesters",
@@ -52,27 +162,35 @@
     "g_risk_comm_score",
     "g_risk_comm_size",
     "g_same_comm",
-    "g_appr_risk_pagerank"
+    "g_appr_risk_pagerank",
+    "rf_near_limit",
+    "rf_after_hours",
+    "rf_fast_approval",
+    "rf_debtor_repeat",
+    "rf_pair_dependency",
+    "rule_score",
+    "approver_anomaly_score"
   ],
-  "memakai_output_isolation_forest": false,
+  "memakai_output_isolation_forest": true,
   "split": {
-    "train": "2021–2024",
-    "validation": "2025",
+    "train": "2021–2024 (pilar)",
+    "validation": "2025 (kalibrasi, penggabung, threshold)",
     "test": "2026 Jan–Sep"
   },
   "metrik_test": {
-    "precision": 0.8643,
-    "recall": 0.9095,
-    "F1": 0.8863,
-    "ROC-AUC": 0.9742,
-    "PR-AUC": 0.903,
-    "MCC": 0.8693
+    "precision": 0.8799,
+    "recall": 0.8952,
+    "F1": 0.8875,
+    "ROC-AUC": 0.975,
+    "PR-AUC": 0.9117,
+    "MCC": 0.8706
   },
   "batasan": [
     "Kalibrasi berlaku untuk populasi kasus yang direview audit; di seluruh transaksi skor = prioritas relatif.",
+    "Bobot penggabung dipelajari dari label audit 2025; pola kolusi baru yang belum berlabel cenderung diberi bobot kecil, sehingga radar IF tetap disajikan terpisah.",
     "Data sintetis; perlu validasi ulang dengan data internal sebelum produksi.",
     "Skor adalah indikasi, bukan bukti. Keputusan akhir oleh investigator."
   ],
   "pemilik": "Unit Anti-Fraud (contoh)",
-  "dibuat": "2026-10-11"
+  "dibuat": "2026-10-14"
 }

@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, inspect, text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_DATA_DIR = Path(os.getenv("RADAR_APP_DATA_DIR", PROJECT_ROOT / "outputs" / "app_data"))
-DATE_COLUMNS = {"transactions_scored": ["event_time", "request_ts", "approve_ts"], "test_features": ["case_ts"],
+DATE_COLUMNS = {"transactions_scored": ["event_time", "request_ts", "approve_ts"], "test_features": ["case_ts", "event_time"],
                 "employees": ["employment_start_date"]}
 
 

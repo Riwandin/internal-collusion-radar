@@ -1,5 +1,5 @@
 kelompok,approver_bulan,terbukti_menyetujui_kolusi
-keduanya,36,0.9444444444444444
-hanya IF,34,0.7058823529411765
-hanya classifier,12,1.0
-tidak ditandai,859,0.09545983701979045
+keduanya,32,1.0
+hanya IF,34,0.7647058823529411
+hanya classifier,16,1.0
+tidak ditandai,859,0.09080325960419092

@@ -14,7 +14,9 @@ from ..ui import services
 
 def classifier_tab(settings: dict) -> None:
     metrics, test = services.table("model_metrics"), services.table("test_features")
-    st.markdown("**Metrik utama: PR-AUC** (paling jujur untuk data imbalanced). Accuracy dilaporkan, tetapi tidak dipakai memilih model.")
+    st.markdown("**Metrik utama: PR-AUC** (paling jujur untuk data imbalanced). Tabel memuat Risk Engine (final), tiap pilar sendirian, "
+                "dan pembanding (rules, logistic regression, bobot manual v9.x, satu model 40 fitur). Accuracy dilaporkan, tetapi tidak "
+                "dipakai memilih model.")
     view = metrics.set_index(["periode", "model"])[["accuracy", "precision", "recall", "F1", "F2", "MCC", "ROC-AUC", "PR-AUC", "TP", "FP", "FN", "TN"]]
     st.dataframe(view.style.format({c: "{:.3f}" for c in ["accuracy", "precision", "recall", "F1", "F2", "MCC", "ROC-AUC", "PR-AUC"]}),
                  use_container_width=True)
@@ -51,10 +53,11 @@ def classifier_tab(settings: dict) -> None:
                          markers=True, labels={"value": "", "month": "bulan"})
         st.plotly_chart(ui.style_figure(figure, "Stabil per bulan (2026)", height=300), use_container_width=True)
     with right:
-        ablation = services.table("ablation")
-        figure = px.bar(ablation, x="fitur", y="PR-AUC test", text_auto=".3f", color_discrete_sequence=[ui.BLUE])
-        figure.update_layout(yaxis_range=[0.5, 1])
-        st.plotly_chart(ui.style_figure(figure, "Ablation: nilai tiap kelompok fitur", "PR-AUC test", height=300), use_container_width=True)
+        ablation = services.table("ablation").head(4)
+        figure = px.bar(ablation, x="fitur", y="PR-AUC test", text_auto=".3f", color_discrete_sequence=[ui.BLUE], labels={"fitur": ""})
+        figure.update_layout(yaxis_range=[0, 1])
+        st.plotly_chart(ui.style_figure(figure, "Ablation: nilai tiap pilar", "PR-AUC test saat pilar ditambah satu per satu", height=300),
+                        use_container_width=True)
     st.markdown("**Analisis error per pola (test 2026)** — pola kolusi idealnya tertangkap; hard negative (`Normal - …`) idealnya tidak ditandai.")
     st.dataframe(services.table("pattern_analysis").style.format({"label_kolusi": "{:.0%}", "ditandai_model": "{:.0%}", "ditandai_rules": "{:.0%}"}),
                  use_container_width=True, hide_index=True)
@@ -63,7 +66,7 @@ def classifier_tab(settings: dict) -> None:
 def render() -> None:
     ui.page_header("Performa Model", "Setiap model dinilai dengan metrik yang cocok dengan jenis dan kegunaannya")
     settings = services.app_settings()
-    tabs = st.tabs(["Classifier (skor transaksi)", "Isolation Forest (radar approver)", "Graph (komunitas)", "Rules (baseline)",
+    tabs = st.tabs(["Risk Engine & pilar (skor transaksi)", "Isolation Forest (radar approver)", "Graph (komunitas)", "Rules (baseline)",
                     "Fairness", "Seleksi & tuning"])
     with tabs[0]:
         classifier_tab(settings)

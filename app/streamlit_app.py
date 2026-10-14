@@ -18,7 +18,7 @@ from radar_app.auth import ROLE_LABELS, demo_users, verify_login  # noqa: E402
 from radar_app.config import SETTINGS  # noqa: E402
 from radar_app.ui import components as ui  # noqa: E402
 from radar_app.ui import services  # noqa: E402
-from radar_app.views import (assistant, impact, inv_overview, mgmt_overview, mlops, network, run_model)  # noqa: E402
+from radar_app.views import (assistant, engine, impact, inv_overview, mgmt_overview, mlops, network, run_model)  # noqa: E402
 
 ui.inject_css()
 
@@ -70,18 +70,18 @@ def login_page() -> None:
         c1, c2 = st.columns(2)
         c1.markdown(
             ui.kpi_card(
-                "Investigator (4 Menu Fokus)",
+                "Investigator (5 Menu Fokus)",
                 "Operasional",
-                "Meja Investigasi 360° (Dossier + Unduh PDF + Tindak Lanjut), Peta Jaringan, Cek Berkas Baru, Copilot AI",
+                "Meja Investigasi 360° (skor 4 pilar + Dossier PDF), Peta Jaringan, Cek Berkas Baru, Risk Engine, Copilot AI",
                 ui.ORANGE,
             ),
             unsafe_allow_html=True,
         )
         c2.markdown(
             ui.kpi_card(
-                "Manajemen (4 Menu Fokus)",
+                "Manajemen (5 Menu Fokus)",
                 "Strategis",
-                "Command Center & Peta Cabang, Simulasi Dampak & Kapasitas, Kesehatan Sistem & Tata Kelola, Copilot AI",
+                "Command Center, Simulasi Dampak & Kapasitas, Risk Engine 4 Pilar, Kesehatan Sistem & Tata Kelola, Copilot AI",
                 ui.BLUE,
             ),
             unsafe_allow_html=True,
@@ -96,7 +96,8 @@ def sidebar_status(user: dict) -> None:
         store = services.get_store()
         risk_model = services.get_risk_model()
         st.caption(f"Backend: {store.backend}")
-        st.caption(f"Model ML: {'🟢 Aktif' if risk_model is not None else '🟡 Terbatas'}")
+        engine_ready = risk_model is not None and hasattr(risk_model, "pillar_scores")
+        st.caption(f"Risk Engine 4 pilar: {'🟢 Aktif' if engine_ready else '🟡 Terbatas (skor dari notebook)'}")
         st.caption(f"Data s.d.: {services.app_settings().get('data_end_date', '-')}")
 
         llm = services.get_llm()
@@ -123,6 +124,7 @@ if user["role"] == "investigator":
             page(inv_overview.render, "Meja Investigasi 360°", ":material/person_search:", "meja-investigasi", True),
             page(network.render, "Peta Jaringan & Komplotan", ":material/hub:", "jaringan"),
             page(run_model.render, "Cek Berkas Baru (Live Test)", ":material/play_circle:", "live-test"),
+            page(engine.render, "Risk Engine 4 Pilar", ":material/account_tree:", "risk-engine"),
             page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),
         ],
     }
@@ -131,6 +133,7 @@ else:
         "Menu Manajemen": [
             page(mgmt_overview.render, "Command Center & Peta Cabang", ":material/space_dashboard:", "command-center", True),
             page(impact.render, "Simulasi Dampak Bisnis & Kebijakan", ":material/payments:", "dampak-kebijakan"),
+            page(engine.render, "Risk Engine 4 Pilar", ":material/account_tree:", "risk-engine"),
             page(mlops.render, "Kesehatan Sistem & Tata Kelola", ":material/verified_user:", "tata-kelola"),
             page(assistant.render, "Copilot AI & Regulasi KUR", ":material/smart_toy:", "copilot-ai"),
         ],

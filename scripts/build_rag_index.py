@@ -22,7 +22,7 @@ def main() -> int:
     args = parser.parse_args()
     meta_path = SETTINGS.rag_index_dir / "windows.json"
     if meta_path.exists() and not args.force:
-        embedder = json.loads(meta_path.read_text()).get("embedder", "")
+        embedder = json.loads(meta_path.read_text(encoding="utf-8")).get("embedder", "")
         try:
             import sentence_transformers  # noqa: F401
             real_available = True

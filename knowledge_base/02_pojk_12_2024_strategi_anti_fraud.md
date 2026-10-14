@@ -67,7 +67,7 @@ dalam lampiran POJK. Batas waktu penyampaian tidak tercantum di abstrak dan perl
 | Pilar | Peran Collusion Radar |
 |---|---|
 | Pencegahan | efek jera karena pola kolusi dipantau; profil approver berisiko untuk keputusan rotasi |
-| Deteksi | rules, graph analytics, Isolation Forest, dan classifier menilai setiap approval sebelum dana cair |
+| Deteksi | Risk Engine 4 pilar (rules, Isolation Forest, model konten transaksi, model relasi & graph) menilai setiap approval sebelum dana cair |
 | Investigasi, pelaporan, sanksi | antrean alert berprioritas, bukti terstruktur, draf memo investigasi oleh agen AI untuk ditinjau manusia |
 | Pemantauan, evaluasi, tindak lanjut | dashboard manajemen, uji stres, pemantauan drift, evaluasi kualitas model dan jawaban AI |
 

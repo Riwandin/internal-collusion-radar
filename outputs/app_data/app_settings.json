@@ -1,9 +1,9 @@
 {
-  "final_threshold": 0.47619047619047616,
-  "watch_threshold": 0.23809523809523808,
+  "final_threshold": 0.3496603269383413,
+  "watch_threshold": 0.17483016346917066,
   "rules_threshold": 1,
   "if_top_quantile": 0.95,
-  "model_name": "Random Forest",
+  "model_name": "Risk Engine 4 pilar",
   "loss_per_fraud": 21865653.077975374,
   "fraud_cases_per_year": 840.0,
   "lgd": 0.6,
@@ -13,14 +13,61 @@
   "investigators_available": 6,
   "hours_per_investigator_month": 120,
   "months_2026": 9,
-  "test_recall": 0.9095238095238095,
+  "test_recall": 0.8952380952380953,
   "rules_test_recall": 0.846031746031746,
   "rules_alerts_per_month": 338.77777777777777,
-  "model_alerts_per_month": 128.11111111111111,
-  "shap_method": "Shapley sampling (pengganti; paket shap tidak terpasang)",
-  "screening_engine": "screening manual (PyCaret tidak terpasang)",
-  "tuning_engine": "random search (Optuna tidak terpasang)",
+  "model_alerts_per_month": 123.33333333333333,
+  "shap_method": "shap.TreeExplainer",
+  "screening_engine": "PyCaret compare_models",
+  "tuning_engine": "Optuna TPE + MedianPruner",
   "problem_statement": "Kolusi internal pada approval KUR meningkat 4.8× dalam 4 tahun (3,7% → 17,8% kasus yang direview), terkonsentrasi di jaringan unit tertentu (30% kasus kolusi dari 4 unit), dan memuncak saat tekanan target akhir bulan. Kredit hasil kolusi 12× lebih sering macet dan selama ini baru terdeteksi ±8 bulan setelah dana cair, dengan potensi kerugian ±Rp11.5 M per tahun. Dibutuhkan sistem yang mendeteksi indikasi kolusi sesaat setelah approval (sebelum dana cair), menjelaskan buktinya, dan tetap menyerahkan keputusan kepada manusia.",
   "data_end_date": "2026-09-30",
-  "spearman_if_classifier": 0.4769990261123609
+  "spearman_if_classifier": 0.4875044471945656,
+  "architecture": "Multi-View Risk Engine v10: 4 pilar (Rules, Isolation Forest, Konten, Relasi) + stacking",
+  "pillar_names": {
+    "rule": "Pilar 1 · Rules SOP",
+    "iforest": "Pilar 2 · Anomali approver (IF)",
+    "classifier": "Pilar 3 · Konten transaksi",
+    "graph": "Pilar 4 · Relasi & jaringan"
+  },
+  "pillar_models": {
+    "classifier": "LightGBM",
+    "graph": "Extra Trees",
+    "iforest": "Isolation Forest",
+    "rule": "5 rule SOP"
+  },
+  "fusion_weights": {
+    "rule": 0.0,
+    "iforest": 0.16132649458107937,
+    "classifier": 0.4946123185286649,
+    "graph": 0.3440611868902557
+  },
+  "fusion_coefficients": {
+    "logit_cls": 0.941,
+    "logit_graph": 0.749,
+    "rule_scaled": 0.0,
+    "if_scaled": 1.978,
+    "if_missing": -0.339
+  },
+  "fusion_intercept": -1.1262341236630666,
+  "manual_weights_v9x": {
+    "rule": 0.15,
+    "iforest": 0.2,
+    "classifier": 0.4,
+    "graph": 0.25
+  },
+  "escalation_thresholds": {
+    "classifier": 0.556,
+    "graph": 0.8
+  },
+  "pillar_share_test": {
+    "rule": 0.0,
+    "iforest": 0.1761359784638095,
+    "classifier": 0.48552617692830546,
+    "graph": 0.3383378446078851
+  },
+  "if_fit_end": "2024-12",
+  "test_pr_auc": 0.9117260199549041,
+  "early_fusion_test_pr_auc": 0.895540122114409,
+  "watch_recall_validation": 0.9253472222222222
 }

@@ -11,7 +11,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from ..ui import components as ui
-from ..ui import services
+from ..ui import pillars, services
 from ..ui.network import LEGEND_HTML, build_graph, plotly_network, pyvis_html
 from ..ui.pdf_report import build_employee_dossier_pdf
 from .common import DECISIONS, RED_FLAG_COLUMNS, flags_text, latest_decisions, show_guard_checks
@@ -66,7 +66,7 @@ def _build_employee_queue(period_tx: pd.DataFrame, decisions: pd.DataFrame) -> p
     else:
         employees["komunitas"] = np.nan
 
-    # Skor gabungan hanya untuk pengurutan prioritas tampilan meja kerja (bukan ensemble model)
+    # Urutan prioritas meja kerja (bukan skor model): backlog dulu, lalu alert Tinggi, radar IF, dan skor transaksi tertinggi
     employees["prioritas_urut"] = (
         employees["belum_diputus"] * 25.0
         + employees["alert_tinggi"] * 10.0
@@ -177,12 +177,12 @@ def _build_human_reasons(
     parts = [f"{emp_name} ({emp_id}) menjabat sebagai {pos} ({role}) di Unit {unit}."]
     if pd.notna(anom_score):
         parts.append(
-            f"Pada evaluasi perilaku bulanan (Model 1 - Isolation Forest), yang bersangkutan memiliki Skor Anomali {anom_score:.0f}/100 "
+            f"Pada radar perilaku bulanan (Pilar 2 · Isolation Forest), yang bersangkutan memiliki Skor Anomali {anom_score:.0f}/100 "
             f"(kategori: {employee.get('kategori_anomali', '-')})."
         )
     if n_high > 0:
         parts.append(
-            f"Pada evaluasi transaksi kredit (Model 2 - Classifier), terdapat {n_high} berkas berisiko TINGGI "
+            f"Pada penilaian transaksi (Risk Engine 4 pilar), terdapat {n_high} berkas berisiko TINGGI "
             f"dengan total eksposur {nom_fmt} ({int(employee.get('belum_diputus', 0))} berkas di antaranya belum diputus investigator)."
         )
     else:
@@ -382,6 +382,9 @@ def render() -> None:
             )
             tx_queue["nominal_fmt"] = tx_queue["amount"].map(ui.rupiah)
             tx_queue["alasan_utama"] = tx_queue["top_reasons"].fillna("").str.split(" | ").str[0]
+            contribution_columns = [f"c_{p}" for p in ui.PILLARS]
+            tx_queue["pilar_utama"] = (tx_queue[contribution_columns].idxmax(axis=1).str[2:].map(ui.PILLAR_SHORT)
+                                       if set(contribution_columns) <= set(tx_queue.columns) else "-")
 
             if status_filter == "Belum Diputus Saja":
                 tx_queue = tx_queue[~tx_queue["sudah_diputus"]]
@@ -405,7 +408,7 @@ def render() -> None:
             tx_selection = st.dataframe(
                 tx_queue[[
                     "request_id", "event_time", "approver_name", "requester_name", "requester_unit",
-                    "nominal_fmt", "risk_score", "risk_band", "alasan_utama", "status_label",
+                    "nominal_fmt", "risk_score", "risk_band", "pilar_utama", "alasan_utama", "status_label",
                 ]],
                 hide_index=True,
                 use_container_width=True,
@@ -422,7 +425,8 @@ def render() -> None:
                     "nominal_fmt": "Nominal",
                     "risk_score": st.column_config.ProgressColumn("Skor Risiko", min_value=0, max_value=100, format="%.0f"),
                     "risk_band": "Level",
-                    "alasan_utama": "Alasan Utama (SHAP)",
+                    "pilar_utama": "Pilar Penyebab Utama",
+                    "alasan_utama": "Alasan Utama",
                     "status_label": "Status Keputusan",
                 },
             )
@@ -587,7 +591,7 @@ def render() -> None:
 
     col_tx_list, col_tx_shap = st.columns([1.25, 1.0])
     with col_tx_list:
-        st.caption("Klik satu berkas di tabel bawah untuk membedah alasan SHAP dan bukti detailnya di sebelah kanan:")
+        st.caption("Klik satu berkas di tabel bawah untuk membedah skor 4 pilar, alasan, dan bukti detailnya di sebelah kanan:")
         display_tx = alerts_df.head(50).reset_index(drop=True)
         default_tx_idx = 0
         if selected_req_id and selected_req_id in display_tx["request_id"].values:
@@ -612,7 +616,7 @@ def render() -> None:
                 "risk_score": st.column_config.ProgressColumn("Skor", min_value=0, max_value=100, format="%.0f"),
                 "risk_band": "Level",
                 "keputusan_saat_ini": "Keputusan",
-                "alasan_singkat": "Alasan SHAP",
+                "alasan_singkat": "Alasan",
             },
         )
         sub_rows = getattr(getattr(tx_sub_sel, "selection", None), "rows", []) or []
@@ -630,23 +634,17 @@ def render() -> None:
             f"{chosen_alert_row['loan_product']} · {ui.rupiah(chosen_alert_row['amount'], short=False)} "
             f"({ui.percent(chosen_alert_row['limit_ratio'])} dari limit wewenang)"
         )
+        if pillars.has_pillars(chosen_alert_row):
+            pillars.pillar_cards(chosen_alert_row)
+            st.plotly_chart(pillars.contribution_waterfall(chosen_alert_row, f"Dari mana skor {chosen_alert_row['risk_score']:.0f} berasal?",
+                                                           height=270), use_container_width=True)
+
         explanations = services.table("alert_explanations")
-        reasons_shap = explanations[explanations["request_id"] == req_id].sort_values("rank", ascending=False)
-        if not reasons_shap.empty:
-            fig_shap = go.Figure(
-                go.Bar(
-                    x=reasons_shap["shap_value"],
-                    y=reasons_shap["reason"],
-                    orientation="h",
-                    marker_color=[ui.GROUP_COLORS.get(g, ui.ORANGE) for g in reasons_shap["feature_group"]],
-                    text=[f"+{v:.2f}" for v in reasons_shap["shap_value"]],
-                    textposition="outside",
-                )
-            )
-            fig_shap.update_layout(xaxis_title="Kontribusi penaik risiko (SHAP)", yaxis=dict(automargin=True))
-            st.plotly_chart(ui.style_figure(fig_shap, f"Kenapa berkas {req_id} skornya tinggi?", height=185), use_container_width=True)
+        reasons_frame = explanations[explanations["request_id"] == req_id]
+        if not reasons_frame.empty and "contribution" in reasons_frame:
+            st.plotly_chart(pillars.reasons_chart(reasons_frame, f"Alasan di balik skor berkas {req_id}"), use_container_width=True)
         else:
-            st.info("Berkas ini berisiko rendah sehingga tidak memiliki uraian penalti SHAP tinggi.")
+            st.info("Berkas ini berisiko rendah sehingga tidak memiliki uraian alasan.")
 
         evidence_items = [e for e in str(chosen_alert_row.get("evidence") or "").split(" | ") if e and e != "nan"]
         if evidence_items:

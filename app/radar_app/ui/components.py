@@ -12,7 +12,17 @@ BLUE, ORANGE, GREEN, YELLOW, PURPLE, RED = "#2a78d6", "#eb6834", "#1baf7a", "#ed
 INK, INK_SECONDARY, MUTED, GRID, SURFACE = "#1f2328", "#52514e", "#8a8984", "#e6e5e1", "#f6f7f9"
 BAND_COLORS = {"Tinggi": ORANGE, "Sedang": YELLOW, "Rendah": "#9ec5f0"}
 ANOMALY_COLORS = {"Perlu dilihat": ORANGE, "Pantau": YELLOW, "Normal": "#9ec5f0"}
-GROUP_COLORS = {"Transaksi": BLUE, "Riwayat": PURPLE, "Rules": YELLOW, "Graph": ORANGE}
+GROUP_COLORS = {"Transaksi": BLUE, "Riwayat debitur": PURPLE, "Relasi pasangan": YELLOW, "Graph": ORANGE, "Rules": MUTED}
+PILLARS = ["rule", "iforest", "classifier", "graph"]
+PILLAR_LABELS = {"rule": "Pilar 1 · Rules SOP", "iforest": "Pilar 2 · Anomali approver (IF)",
+                 "classifier": "Pilar 3 · Konten transaksi", "graph": "Pilar 4 · Relasi & jaringan"}
+PILLAR_SHORT = {"rule": "Rules", "iforest": "IF", "classifier": "Konten", "graph": "Relasi"}
+PILLAR_COLORS = {"rule": MUTED, "iforest": GREEN, "classifier": BLUE, "graph": ORANGE}
+PILLAR_SCORE_COLUMN = {"rule": "s_rule", "iforest": "s_if", "classifier": "s_cls", "graph": "s_graph"}
+PILLAR_QUESTION = {"rule": "aturan SOP apa yang dilanggar?",
+                   "iforest": "apakah approver menyimpang dari rekan sejabatannya (90 hari)?",
+                   "classifier": "apakah isi pengajuan mirip kasus kolusi terbukti?",
+                   "graph": "apakah hubungan requester–approver & jaringannya mencurigakan?"}
 RED_FLAG_LABELS = {"rf_near_limit": "Near limit 95–99%", "rf_after_hours": "Luar jam kerja (19–07/akhir pekan)",
                    "rf_fast_approval": "Approval kilat < 20 menit", "rf_debtor_repeat": "Debitur sama ≥ 2×/tahun",
                    "rf_pair_dependency": "Ketergantungan approver"}

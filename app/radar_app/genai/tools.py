@@ -19,6 +19,10 @@ ROLE_TOOLS = {
 }
 RED_FLAG_NAMES = {"rf_near_limit": "near limit 95–99%", "rf_after_hours": "luar jam kerja", "rf_fast_approval": "approval kilat",
                   "rf_debtor_repeat": "debitur berulang", "rf_pair_dependency": "ketergantungan approver"}
+PILLAR_KEYS = {"rule": "Rules SOP", "iforest": "Anomali approver (IF)", "classifier": "Konten transaksi",
+               "graph": "Relasi & jaringan"}
+PILLAR_SCORE_COLUMNS = {"Rules SOP": "s_rule", "Anomali approver (IF)": "s_if", "Konten transaksi": "s_cls",
+                        "Relasi & jaringan": "s_graph"}
 TOOL_SPECS = {
     "cari_alert": {"description": "Cari alert transaksi. Argumen opsional: level ('Tinggi'/'Sedang'), unit (nama unit), "
                                   "red_flag (salah satu: near_limit, after_hours, fast_approval, debtor_repeat, pair_dependency), "
@@ -163,7 +167,12 @@ class AgentTools:
                 "debitur": f"{row.get('debtor_name_masked', '-')} ({row['debtor_id']}, {row['debtor_type']}, {row['business_sector']})",
                 "produk": row["loan_product"], "nominal": float(row["amount"]), "limit_ratio": round(float(row["limit_ratio"]), 3),
                 "skor_risiko": float(row["risk_score"]), "kategori": row["risk_band"],
-                "alasan_shap": [{"alasan": r["reason"], "kontribusi_shap": round(float(r["shap_value"]), 3)} for _, r in reasons.iterrows()],
+                "skor_pilar": {label: (None if pd.isna(row.get(column)) else round(float(row[column]), 1))
+                               for label, column in PILLAR_SCORE_COLUMNS.items()},
+                "kontribusi_pilar": {label: round(float(row.get(f"c_{key}", 0) or 0), 3) for key, label in PILLAR_KEYS.items()},
+                "jaring_pengaman": str(row.get("escalation") or "") if str(row.get("escalation") or "") != "nan" else "",
+                "alasan": [{"alasan": r["reason"], "pilar": PILLAR_KEYS.get(r.get("pilar"), r.get("pilar")),
+                            "kontribusi": round(float(r["contribution"]), 3)} for _, r in reasons.iterrows()],
                 "red_flag": flags, "bukti": str(row.get("evidence") or "").split(" | "),
                 "skor_anomali_approver": None if pd.isna(row.get("approver_anomaly_score")) else round(float(row["approver_anomaly_score"]), 1),
                 "alasan_anomali_approver": row.get("approver_anomaly_reason") or "",
@@ -233,14 +242,18 @@ class AgentTools:
     def draf_memo_investigasi(self, request_id: str) -> dict:
         detail = self.detail_alert(request_id)
         sop = self.cari_regulasi("struktur memo investigasi langkah klarifikasi SOP alert") if self.retriever else {"sumber": []}
-        reasons = "\n".join(f"   - {r['alasan']} (kontribusi SHAP {r['kontribusi_shap']:+.2f})" for r in detail["alasan_shap"]) or "   - (tidak ada)"
+        reasons = "\n".join(f"   - [{r['pilar']}] {r['alasan']} (kontribusi {r['kontribusi']:+.2f} log-odds)"
+                            for r in detail["alasan"]) or "   - (tidak ada)"
+        pillar_scores = " · ".join(f"{label} {'-' if value is None else f'{value:.0f}'}"
+                                   for label, value in detail["skor_pilar"].items())
         evidence = "\n".join(f"   - {e}" for e in detail["bukti"] if e) or "   - (tidak ada)"
         memo = f"""DRAF MEMO INVESTIGASI — MENUNGGU PERSETUJUAN INVESTIGATOR
 1. Identitas alert: {detail['request_id']} · approval {detail['tanggal_approval']} · skor {detail['skor_risiko']:.0f}/100 · kategori {detail['kategori']}
    Requester: {detail['requester']}
    Approver : {detail['approver']}
    Debitur  : {detail['debitur']} · {detail['produk']} · nominal Rp{detail['nominal']:,.0f} ({detail['limit_ratio']:.0%} limit approver)
-2. Ringkasan indikasi (alasan model):
+2. Ringkasan indikasi (Risk Engine 4 pilar):
+   Skor pilar (0–100): {pillar_scores}
 {reasons}
    Red flag terpenuhi: {', '.join(detail['red_flag']) or 'tidak ada'}
 3. Bukti pendukung dari data:
@@ -310,11 +323,16 @@ Catatan: memo disusun dari indikasi berbasis data dan tidak memuat kesimpulan be
     def performa_model(self) -> dict:
         metrics = self.store.table("model_metrics")
         test = metrics[metrics["periode"] == "test 2026"]
+        key_models = test[test["model"].str.contains("Risk Engine|Early fusion|Rules|ambang 70|Logistic", regex=True)]
+        test = pd.concat([key_models, test]).drop_duplicates("model")
         radar = self.store.table("radar_evaluation")
         radar_recent = radar[radar["periode"] == "2025–2026"]
         graph = self.store.table("graph_evaluation")
         fairness = self.store.table("fairness")
-        return {"classifier_test_2026": records(test, ["model", "precision", "recall", "F1", "ROC-AUC", "PR-AUC", "FP", "FN"], 5),
+        weights = self.store.table("fusion_weights")
+        return {"classifier_test_2026": records(test, ["model", "precision", "recall", "F1", "ROC-AUC", "PR-AUC", "FP", "FN"], 9),
+                "bobot_pilar_dipelajari": {r["label"]: round(float(r["bobot_efektif"]), 3) for _, r in weights.iterrows()}
+                if len(weights) else {},
                 "radar_isolation_forest_2025_2026": records(radar_recent, ["radar", "PR-AUC", "precision@5%", "lift@5%"], 5),
                 "graph_peringatan_dini": {"precision_rata": round(float(graph["precision"].tail(21).mean()), 3),
                                           "lift_rata": round(float(graph["lift"].tail(21).mean()), 2)},

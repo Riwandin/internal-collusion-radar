@@ -195,7 +195,7 @@ class InvestigationAgent:
                          f"skor {a['risk_score']:.0f} ({a['risk_band']}) · {a.get('top_reasons') or ''}" for a in output["alert"]]
                 parts.append(f"Ditemukan {output['jumlah_ditemukan']} alert; {output['ditampilkan']} teratas (sumber: cari_alert):\n" + "\n".join(lines))
             elif tool == "detail_alert":
-                reasons = "; ".join(r["alasan"] for r in output["alasan_shap"]) or "-"
+                reasons = "; ".join(f"{r['alasan']} [{r['pilar']}]" for r in output["alasan"]) or "-"
                 parts.append(f"Transaksi {output['request_id']} berskor {output['skor_risiko']:.0f}/100 (kategori {output['kategori']}). "
                              f"Requester {output['requester']}; approver {output['approver']}. Alasan utama: {reasons}. "
                              f"Red flag: {', '.join(output['red_flag']) or 'tidak ada'}. Skor anomali approver: "
@@ -246,7 +246,9 @@ class InvestigationAgent:
                 lines = [f"- {m['model']}: precision {m['precision']:.0%}, recall {m['recall']:.0%}, PR-AUC {m['PR-AUC']:.3f}"
                          for m in output["classifier_test_2026"]]
                 low, high = output["fairness_FPR_model_rentang"]
+                weights = ", ".join(f"{name} {value:.0%}" for name, value in output.get("bobot_pilar_dipelajari", {}).items())
                 parts.append("Kinerja di test 2026 (sumber: performa_model):\n" + "\n".join(lines)
+                             + (f"\nBobot efektif pilar Risk Engine (dipelajari di validation 2025): {weights}." if weights else "")
                              + f"\nAlarm palsu (FPR) model antarsegmen berkisar {low:.1%}–{high:.1%}.")
         return "\n\n".join(p for p in parts if p)
 

@@ -1,6 +1,6 @@
 {
-  "dense_k": 3,
+  "dense_k": 8,
   "sparse_k": 5,
   "top_n": 4,
-  "embedder": "LSA TF-IDF+SVD (131 dimensi, pengganti)"
+  "embedder": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 }
